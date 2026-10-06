@@ -1,40 +1,29 @@
-import { Feather } from '@expo/vector-icons'
-import { BlurView } from 'expo-blur'
+import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useEffect } from 'react'
-import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Image, StyleSheet, Text, View } from 'react-native'
 import Animated, {
+  Easing,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
-  withSpring,
+  withDelay,
+  withTiming,
 } from 'react-native-reanimated'
-import Svg, { Circle, Defs, LinearGradient, RadialGradient, Rect, Stop } from 'react-native-svg'
 
-import ChoreStar from '@/assets/icons/choreStar.svg'
-import EmblemHalo from '@/assets/zodiac-art/emblem-halo-frame.svg'
-import { useTransformProgress } from '@/features/emblem'
+import { StelarModal, StelarModalPanel } from '@/components/ui/StelarModal'
 import {
   FRAMES_BY_SIGN,
   frameIndexFor,
 } from '@/features/tabs/components/constellation/RevealedEmblem'
+import { GLYPH_BY_SIGN } from '@/features/tabs/zodiac/glyphs'
 import type { ZodiacSign } from '@/features/tabs/zodiac/types'
-import { colors, radius, spacing, typography } from '@/theme'
+import { colors, typography } from '@/theme'
+
+import { useTransformProgress } from '../hooks'
+import { EVIDENCE_ORDER, nextStageForecast, type EvidenceKey } from '../logic'
+import { MonthConstellation } from './MonthConstellation'
 
 export type EmblemStar = { name: string; role: string }
-
-// Polvo de estrellas quieto del fondo del modal — posiciones fijas (no
-// random, para que no parpadee entre renders) en el tercio superior, lejos
-// del emblema. Distintos radios/brillos para dar profundidad sin competir.
-const STAR_DUST = [
-  { x: 14, y: 12, r: 1.1, o: 0.5 },
-  { x: 82, y: 9, r: 0.9, o: 0.42 },
-  { x: 68, y: 19, r: 1.4, o: 0.6 },
-  { x: 28, y: 24, r: 0.8, o: 0.34 },
-  { x: 90, y: 28, r: 1.1, o: 0.46 },
-  { x: 8, y: 33, r: 1.2, o: 0.4 },
-  { x: 50, y: 7, r: 0.7, o: 0.3 },
-  { x: 40, y: 16, r: 0.9, o: 0.38 },
-] as const
 
 type TuEmblemaModalProps = {
   visible: boolean
@@ -55,6 +44,10 @@ type TuEmblemaModalProps = {
   daysInOrbit?: number
   /** "19 de septiembre": el día en que se completó la figura (el logro). */
   completedOn?: string | null
+  /** Qué hábitos de HOY cuentan para el reveal (misma vara que el RPC). */
+  todayEvidence?: readonly EvidenceKey[]
+  /** Promedio de puntos/día de los últimos 7 días cerrados (para el pronóstico). */
+  pointsPerDay?: number
 }
 
 /**
@@ -79,13 +72,11 @@ export function EmblemFramePreloader({ sign }: { sign: ZodiacSign }) {
 }
 
 /**
- * "Tu {signo}" — opened from the compact constellation hero on Hoy, over a
- * blurred Hoy (revelaciones language). Sign-agnostic: emblem, label, count and
- * named stars all derive from `sign`. PROGRESS-FOCUSED per the product
- * critique: the explicit % + count of the month's figure, the named stars lit
- * so far, and what's next — so it answers "¿cuánto llevo y qué sigue?", not
- * just "mira el arte". The gold figure is the representative art of your sign;
- * the data is the monthly constellation. No actions; the only control is ✕.
+ * "Tu {signo}" — se abre desde el emblema de Hoy. Con el lenguaje común de los
+ * modales (StelarModal, dueña 6 oct 2026): el signo como categoría en oro, un
+ * titular con lo que llevas, el emblema y su avance en un panel, y la estrella
+ * que sigue en otro. Dice cuántas faltan: la dueña antepone la claridad y la
+ * honestidad a la regla anti-countdown del manifiesto (6 oct 2026).
  */
 export function TuEmblemaModal({
   visible,
@@ -94,186 +85,196 @@ export function TuEmblemaModal({
   signLabel,
   trained,
   total,
-  nextStar,
   completedOn,
+  todayEvidence = [],
+  pointsPerDay = 0,
 }: TuEmblemaModalProps) {
   const complete = total > 0 && trained >= total
   const nextMonth = MONTHS[(new Date().getMonth() + 1) % 12]
-  // Tope en 100: con la figura completa las luces siguen sumando (28 de 25) y la
-  // barra se salía de la tarjeta por la derecha.
+  // Tope en 100: con la figura completa las luces siguen sumando (28 de 25).
   const pct = total > 0 ? Math.min(100, Math.round((trained / total) * 100)) : 0
-  // El signo en title-case para leerlo dentro de una frase ("Tu Leo se
-  // revela…"). `signLabel` llega en MAYÚSCULAS (ZODIAC[sign].label), que en
-  // medio de un texto gritaría. Dinámico: jamás "emblema" hardcodeado.
+  // El signo en title-case para leerlo dentro de una frase.
   const signTitle = signLabel.charAt(0).toUpperCase() + signLabel.slice(1).toLowerCase()
-  // Halo brightens with progress — light grows as the figure fills.
-  const haloOpacity = 0.3 + (pct / 100) * 0.6
-  // EL MISMO emblema del Tab Hoy (el frame del % de revelado vigente), como
-  // <Image> plano — no Skia, así no choca TextureViews con el del hero detrás.
-  const { progress: emblemProgress } = useTransformProgress()
+  const Glyph = GLYPH_BY_SIGN[sign]
+  // El emblema TAL COMO VA REVELADO (el mismo frame del Tab Hoy): se revela con
+  // tus hábitos (acumulado, nunca retrocede). La constelación del mes va encima.
+  const { progress: revealPct, stage } = useTransformProgress()
   const frames = FRAMES_BY_SIGN[sign]
-  const emblemFrame = frames[frameIndexFor(emblemProgress)] ?? frames[frames.length - 1]
+  const emblemFrame = frames[frameIndexFor(revealPct)] ?? frames[frames.length - 1]
+  // Lo que sigue, honesto: la etapa siguiente y, si hay ritmo reciente, en
+  // cuántos días como los suyos llega (sin ritmo no se inventa un número).
+  const forecast = nextStageForecast(revealPct, pointsPerDay)
+  const forecastLine = !forecast.next
+    ? `Tu ${signTitle} ya está completo.`
+    : forecast.days != null
+      ? `A tu ritmo de los últimos 7 días, en ~${forecast.days} ${forecast.days === 1 ? 'día' : 'días'}.`
+      : 'Cada día con déficit, entreno o proteína la acerca.'
 
-  // Entrada con CRAFT: el card no aparece de golpe — emerge del cosmos con un
-  // resorte suave (sube + escala + funde). Hace que se sienta "revelado", no
-  // un diálogo del sistema. Reduce-motion lo deja en su sitio al instante.
-  const reduce = useReducedMotion()
-  const enter = useSharedValue(0)
-  useEffect(() => {
-    // Solo al ABRIR: reseteo a 0 y disparo el resorte. Al cerrar dejo el valor
-    // quieto y la salida la funde el animationType="fade" del Modal (sin snap).
-    if (!visible) return
-    enter.value = 0
-    enter.value = reduce ? 1 : withSpring(1, { damping: 19, stiffness: 190, mass: 0.7 })
-  }, [visible, reduce, enter])
-  const cardAnim = useAnimatedStyle(() => ({
-    // La opacidad funde más rápido que asienta el resorte (sin parpadeo por
-    // el overshoot del spring).
-    opacity: Math.min(1, enter.value * 1.5),
-    transform: [{ translateY: (1 - enter.value) * 18 }, { scale: 0.94 + enter.value * 0.06 }],
-  }))
+  const title = complete
+    ? completedOn
+      ? `Completaste tu ${signTitle} el ${completedOn}`
+      : `Completaste tu ${signTitle}`
+    : trained > 0
+      ? `Llevas ${trained} ${trained === 1 ? 'estrella' : 'estrellas'} este mes`
+      : 'Tu figura empieza con tu primer registro'
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={styles.root}>
-        {/* Blurred, dimmed Hoy behind — same language as the revelations. */}
-        <BlurView intensity={28} tint="dark" style={StyleSheet.absoluteFill} />
-        {/* Scrim SOLO atenúa — no cierra. El modal se cierra solo con la ✕ (o
-            el botón atrás de Android vía onRequestClose); un tap afuera lo
-            mantiene abierto. */}
-        <View style={styles.scrim}>
-          {/* Wrapper animado: lleva el tamaño + la elevación (sombra fuera del
-              overflow:hidden del card) y la entrada con resorte. */}
-          <Animated.View style={[styles.cardWrap, cardAnim]}>
-            <View style={styles.card}>
-              {/* Atmósfera — el card deja de ser un panel plano: glow radial
-                oro→magenta detrás del emblema + polvo de estrellas arriba +
-                viñeta inferior que hunde el card en el cosmos. */}
-              <View style={StyleSheet.absoluteFill} pointerEvents="none">
-                <Svg width="100%" height="100%">
-                  <Defs>
-                    <RadialGradient id="emblemGlow" cx="50%" cy="30%" r="62%">
-                      <Stop offset="0%" stopColor={colors.oro} stopOpacity={0.26} />
-                      <Stop offset="38%" stopColor={colors.magenta} stopOpacity={0.15} />
-                      <Stop offset="100%" stopColor={colors.magenta} stopOpacity={0} />
-                    </RadialGradient>
-                    <LinearGradient id="emblemVignette" x1="0" y1="0" x2="0" y2="1">
-                      <Stop offset="0%" stopColor={colors.bg} stopOpacity={0} />
-                      <Stop offset="68%" stopColor={colors.bg} stopOpacity={0} />
-                      <Stop offset="100%" stopColor={colors.bg} stopOpacity={0.55} />
-                    </LinearGradient>
-                  </Defs>
-                  <Rect x="0" y="0" width="100%" height="100%" fill="url(#emblemGlow)" />
-                  {/* Polvo de estrellas — quietas, distintos brillos (no compite
-                    con el emblema, solo da profundidad). */}
-                  {STAR_DUST.map((s, i) => (
-                    <Circle
-                      key={i}
-                      cx={`${s.x}%`}
-                      cy={`${s.y}%`}
-                      r={s.r}
-                      fill={colors.leche}
-                      opacity={s.o}
-                    />
-                  ))}
-                  <Rect x="0" y="0" width="100%" height="100%" fill="url(#emblemVignette)" />
-                </Svg>
-              </View>
-              <Pressable
-                style={styles.close}
-                onPress={onClose}
-                hitSlop={12}
-                accessibilityRole="button"
-                accessibilityLabel="Cerrar"
-              >
-                <Feather name="x" size={20} color={colors.niebla} />
-              </Pressable>
-
-              <ScrollView
-                showsVerticalScrollIndicator={false}
-                contentContainerStyle={styles.scroll}
-                bounces={false}
-              >
-                <Text style={styles.eyebrow}>TU {signLabel.toUpperCase()}</Text>
-
-                {/* El emblema REINA (el emblema del Tab Hoy, no el medallón viejo). */}
-                <View style={styles.emblemWrap}>
-                  <EmblemHalo
-                    width={152}
-                    height={152}
-                    style={[styles.halo, { opacity: haloOpacity }]}
-                  />
-                  <Image
-                    source={emblemFrame}
-                    style={styles.emblem}
-                    resizeMode="contain"
-                    accessibilityLabel={`Tu ${signLabel}. ${trained} de ${total} estrellas encendidas.`}
-                  />
-                </View>
-
-                {/* UNA idea (dueña 28 sep 2026): antes había cuatro números para lo
-                    mismo (79 días, 28 luces, de 19, +9) y metáforas sin traducir.
-                    Completa: el logro con su fecha, en oro, y qué sigue. En
-                    curso: cuántas llevas y cuántas faltan. */}
-                {complete ? (
-                  <>
-                    <Text style={styles.achieved}>
-                      {completedOn
-                        ? `Completaste tu ${signTitle} el ${completedOn}.`
-                        : `Completaste tu ${signTitle}.`}
-                    </Text>
-                    <Text style={styles.daysLine}>
-                      <Text style={styles.daysNum}>{trained}</Text> días registrados este mes.
-                    </Text>
-                  </>
-                ) : (
-                  <>
-                    <Text style={styles.daysLine}>
-                      <Text style={styles.daysNum}>{trained}</Text>
-                      {` de ${total} estrellas · te faltan ${total - trained}`}
-                    </Text>
-                    <View style={styles.barTrack}>
-                      <View style={[styles.barFill, { width: `${pct}%` }]} />
-                    </View>
-                  </>
-                )}
-
-                <Text style={styles.howLine}>Cada día que registras enciende una estrella.</Text>
-
-                {/* La anticipación: en curso, la estrella que sigue con su nombre;
-                    completa, el mes que viene trae una figura nueva. */}
-                {!complete && nextStar ? (
-                  <View style={styles.comingPanel}>
-                    <View style={styles.comingTextCol}>
-                      <Text style={styles.comingEyebrow}>La que sigue</Text>
-                      <Text style={styles.comingName}>{nextStar.name}</Text>
-                      <Text style={styles.comingRole}>{nextStar.role}</Text>
-                    </View>
-                    <View style={styles.comingStar}>
-                      <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
-                        <Defs>
-                          <RadialGradient id="comingGlow" cx="50%" cy="50%" r="50%">
-                            <Stop offset="0%" stopColor={colors.oro} stopOpacity={0.3} />
-                            <Stop offset="42%" stopColor={colors.oro} stopOpacity={0.09} />
-                            <Stop offset="100%" stopColor={colors.oro} stopOpacity={0} />
-                          </RadialGradient>
-                        </Defs>
-                        <Rect x="0" y="0" width="100%" height="100%" fill="url(#comingGlow)" />
-                      </Svg>
-                      <ChoreStar width={52} height={72} opacity={0.92} />
-                    </View>
-                  </View>
-                ) : complete ? (
-                  <Text style={styles.nextLine}>En {nextMonth} empieza tu siguiente figura.</Text>
-                ) : null}
-              </ScrollView>
-            </View>
-          </Animated.View>
+    <StelarModal
+      visible={visible}
+      onClose={onClose}
+      kicker={`Tu ${signTitle}`}
+      kickerColor={colors.oroSoft}
+      icon={
+        <View style={styles.iconDisc}>
+          <Glyph width={18} height={18} color={colors.oroSoft} />
         </View>
+      }
+      title={title}
+    >
+      <StelarModalPanel style={styles.emblemPanel}>
+        {/* Tu Acuario como va revelado + tu constelación del mes encendida
+            encima (como en Hoy): dos avances distintos, uno sobre otro. */}
+        <View style={styles.figure}>
+          <Image
+            source={emblemFrame}
+            style={styles.figureArt}
+            resizeMode="contain"
+            accessibilityLabel={`Tu ${signTitle}, ${revealPct} por ciento revelado.`}
+          />
+          <View style={StyleSheet.absoluteFill} pointerEvents="none">
+            <MonthConstellation sign={sign} lit={Math.min(trained, total)} size={FIGURE} />
+          </View>
+        </View>
+
+        <View style={styles.meter}>
+          <View style={styles.meterHead}>
+            <MaterialCommunityIcons name="star-four-points" size={14} color={colors.oroSoft} />
+            <Text style={styles.meterLabel}>Tu constelación de este mes</Text>
+          </View>
+          <Text style={styles.count}>
+            <Text style={styles.countNum}>{trained}</Text>
+            <Text style={styles.countOf}>
+              {complete || total - trained <= 0
+                ? ` de ${total} estrellas`
+                : ` de ${total} estrellas · te faltan ${total - trained}`}
+            </Text>
+          </Text>
+          <ProgressBar pct={pct} color={colors.oroSoft} />
+        </View>
+
+        <View style={styles.meter}>
+          <View style={styles.meterHead}>
+            <MaterialCommunityIcons name="eye-outline" size={14} color={colors.magenta} />
+            <Text style={styles.meterLabel}>{`Tu ${signTitle} revelado`}</Text>
+          </View>
+          <Text style={styles.count}>
+            <Text style={[styles.countNum, { color: colors.magenta }]}>{revealPct}%</Text>
+            <Text style={styles.countOf}>{`  ${stage.label}`}</Text>
+          </Text>
+          <ProgressBar pct={revealPct} color={colors.magenta} />
+          {forecast.next ? (
+            <Text style={styles.nextStage}>
+              <Text style={styles.nextStageLabel}>{`Siguiente: ${forecast.next.label}. `}</Text>
+              {forecastLine}
+            </Text>
+          ) : (
+            <Text style={styles.nextStage}>{forecastLine}</Text>
+          )}
+        </View>
+
+        {/* Qué de HOY ya revela (la causa con nombre): encendido lo que cuenta. */}
+        <View style={styles.today}>
+          <Text style={styles.todayLabel}>
+            {todayEvidence.length > 0 ? 'Hoy ya suma' : 'Hoy aún no suma'}
+          </Text>
+          <View style={styles.chips}>
+            {EVIDENCE_ORDER.map((k) => (
+              <EvidenceChip key={k} k={k} on={todayEvidence.includes(k)} />
+            ))}
+          </View>
+        </View>
+      </StelarModalPanel>
+
+      {/* Qué mueve cada cosa, con ícono: que se entienda. */}
+      <View style={styles.howList}>
+        <HowRow icon="star-four-points" color={colors.oroSoft}>
+          Cada día con registro enciende una estrella. Se reinicia cada mes.
+        </HowRow>
+        <HowRow icon="eye-outline" color={colors.magenta}>
+          {`Tu ${signTitle} se revela con déficit, entrenos, proteína, sueño de 7 h y agua. Nunca retrocede.`}
+        </HowRow>
+        <HowRow icon="check-decagram-outline" color={colors.oroSoft}>
+          {complete
+            ? `Completaste tus ${total} estrellas. En ${nextMonth} empieza una constelación nueva.`
+            : `Con las ${total} estrellas cierras tu constelación del mes.`}
+        </HowRow>
       </View>
-    </Modal>
+    </StelarModal>
   )
 }
+
+/** Barra de avance que se llena al abrir el modal. */
+function ProgressBar({ pct, color }: { pct: number; color: string }) {
+  const reduce = useReducedMotion() ?? false
+  const w = useSharedValue(reduce ? pct : 0)
+  useEffect(() => {
+    w.value = reduce
+      ? pct
+      : withDelay(250, withTiming(pct, { duration: 900, easing: Easing.out(Easing.cubic) }))
+  }, [pct, reduce, w])
+  const fill = useAnimatedStyle(() => ({ width: `${w.value}%` }))
+  return (
+    <View style={styles.barTrack}>
+      <Animated.View style={[styles.barFill, { backgroundColor: color }, fill]} />
+    </View>
+  )
+}
+
+const CHIP: Record<
+  EvidenceKey,
+  { label: string; icon: React.ComponentProps<typeof MaterialCommunityIcons>['name'] }
+> = {
+  deficit: { label: 'Déficit', icon: 'silverware-fork-knife' },
+  trained: { label: 'Entreno', icon: 'dumbbell' },
+  protein: { label: 'Proteína', icon: 'food-drumstick' },
+  sleep: { label: 'Sueño 7 h', icon: 'weather-night' },
+  water: { label: 'Agua', icon: 'water' },
+}
+
+/** Un hábito del reveal: encendido (magenta) si hoy ya cuenta, tenue si no. */
+function EvidenceChip({ k, on }: { k: EvidenceKey; on: boolean }) {
+  const c = CHIP[k]
+  return (
+    <View
+      style={[styles.chip, on && styles.chipOn]}
+      accessibilityLabel={`${c.label}: ${on ? 'cuenta hoy' : 'aún no'}`}
+    >
+      <MaterialCommunityIcons name={c.icon} size={13} color={on ? colors.magenta : colors.niebla} />
+      <Text style={[styles.chipText, on && styles.chipTextOn]}>{c.label}</Text>
+    </View>
+  )
+}
+
+function HowRow({
+  icon,
+  color,
+  children,
+}: {
+  icon: 'star-four-points' | 'eye-outline' | 'check-decagram-outline'
+  color: string
+  children: React.ReactNode
+}) {
+  return (
+    <View style={styles.howRow}>
+      <View style={styles.howIcon}>
+        <MaterialCommunityIcons name={icon} size={16} color={color} />
+      </View>
+      <Text style={styles.howText}>{children}</Text>
+    </View>
+  )
+}
+
+const FIGURE = 168
 
 const MONTHS = [
   'enero',
@@ -291,174 +292,91 @@ const MONTHS = [
 ]
 
 const styles = StyleSheet.create({
-  // El logro, en oro: la fecha en que la figura se completó.
-  achieved: {
-    marginTop: 18,
-    fontFamily: typography.uiSemi,
-    fontSize: typography.sizes.title,
-    lineHeight: 22,
-    color: colors.oroSoft,
-    textAlign: 'center',
-  },
-  daysLine: {
-    marginTop: 8,
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.bodyLarge,
-    color: colors.bone,
-    textAlign: 'center',
-  },
-  daysNum: {
-    fontFamily: typography.uiBold,
-    color: colors.leche,
-  },
-  howLine: {
-    marginTop: 14,
-    fontFamily: typography.ui,
-    fontSize: typography.sizes.body,
-    color: colors.niebla,
-    textAlign: 'center',
-  },
-  nextLine: {
-    marginTop: 18,
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.title,
-    color: colors.leche,
-    textAlign: 'center',
-  },
-  root: { flex: 1 },
-  scrim: {
-    flex: 1,
-    backgroundColor: 'rgba(10, 6, 8, 0.4)',
+  iconDisc: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.xxl,
+    backgroundColor: colors.oroTint,
   },
-  // Wrapper: tamaño + elevación. La sombra vive AQUÍ (no en el card) porque el
-  // card tiene overflow:hidden y recortaría su propia sombra. Una caída warm
-  // honda lo despega del cosmos difuminado del fondo.
-  cardWrap: {
-    width: '100%',
-    maxWidth: 360,
-    maxHeight: '100%',
-    borderRadius: radius.card,
-    shadowColor: '#000',
-    shadowOpacity: 0.55,
-    shadowRadius: 28,
-    shadowOffset: { width: 0, height: 18 },
-    elevation: 24,
+  emblemPanel: { alignItems: 'center', paddingTop: 10, paddingBottom: 16, gap: 14 },
+  figure: { width: FIGURE, height: FIGURE },
+  figureArt: { width: FIGURE, height: FIGURE },
+  meter: { alignSelf: 'stretch' },
+  meterHead: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  meterLabel: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.label,
+    color: colors.bone,
   },
-  card: {
-    width: '100%',
-    maxHeight: '100%',
-    backgroundColor: colors.bgCard2,
-    borderRadius: radius.card,
-    borderWidth: 1,
-    borderColor: colors.oroHairline,
+  count: { marginTop: 2, alignSelf: 'stretch' },
+  countNum: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.displayLg,
+    letterSpacing: -0.8,
+    color: colors.oroSoft,
+    fontVariant: ['tabular-nums'],
+  },
+  countOf: { fontFamily: typography.uiBold, fontSize: typography.sizes.ui, color: colors.niebla },
+  barTrack: {
+    alignSelf: 'stretch',
+    marginTop: 6,
+    height: 8,
+    borderRadius: 5,
+    backgroundColor: colors.hairline,
     overflow: 'hidden',
   },
-  scroll: {
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.lg,
-    paddingHorizontal: spacing.lg,
-    alignItems: 'center',
+  barFill: { height: '100%', borderRadius: 5 },
+  nextStage: {
+    marginTop: 8,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    lineHeight: 17,
+    color: colors.bone,
   },
-  // Botón cerrar — disco translúcido para una zona de toque clara sin gritar.
-  close: {
-    position: 'absolute',
-    top: spacing.md,
-    right: spacing.md,
-    zIndex: 2,
+  nextStageLabel: { fontFamily: typography.uiBold, color: colors.leche },
+  today: { alignSelf: 'stretch', gap: 8 },
+  todayLabel: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.label,
+    color: colors.bone,
+  },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 5,
+    paddingHorizontal: 9,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.hairline,
+  },
+  chipOn: { borderColor: colors.magenta, backgroundColor: colors.magentaTint },
+  chipText: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    color: colors.niebla,
+  },
+  chipTextOn: { color: colors.leche },
+  howList: { gap: 10 },
+  howRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  howIcon: {
     width: 30,
     height: 30,
     borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(244, 236, 222, 0.06)',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.oroHairlineSoft,
-  },
-  eyebrow: {
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.micro,
-    letterSpacing: typography.letterSpacing.uppercaseMed,
-    color: colors.magenta,
-  },
-  // El emblema REINA — más grande, con aire debajo (es el héroe del card).
-  emblemWrap: {
-    width: 152,
-    height: 152,
-    marginTop: spacing.xs,
-    marginBottom: spacing.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  halo: { position: 'absolute' },
-  // El emblema ocupa ~0.76 del halo (estética sello: respira dentro del aro).
-  emblem: { width: 116, height: 116 },
-  // Línea de propósito — el ancla explicativa que abre el modal (voz de coach,
-  // serif italic). Es el "ah, ya entendí" que antes vivía enterrado al pie.
-  // Titular cálido — el conteo de luces, no el %. Números en oro.
-  // "· este mes" — contexto callado, no compite con el número.
-  // Total tenue bajo la barra ("de 19 en tu figura") — contexto, no deuda.
-  // Pie de la lista capada — "y N más encendidas", callado (no es una fila
-  // más, es un resumen del resto). Alineado con los nombres (sangría del ✦).
-  // Progress bar — flat views (rail + fill + spark), like the RevealBar.
-  barTrack: {
-    alignSelf: 'stretch',
-    height: 6,
-    borderRadius: 999,
-    backgroundColor: colors.hairline,
-    overflow: 'visible',
-  },
-  barFill: { height: '100%', borderRadius: 999, backgroundColor: colors.oro },
-  // Divisor hairline oro entre filas — convierte la lista en "carta astral".
-  // Panel "La que sigue" — texto a la izquierda, astro a la derecha (eco del
-  // hito del screenshot). Fondo tenue + hairline oro para que destaque sin gritar.
-  comingPanel: {
-    alignSelf: 'stretch',
-    marginTop: spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.xs,
-    paddingLeft: spacing.lg,
-    paddingRight: spacing.sm,
-    borderRadius: radius.card,
-    borderWidth: 1,
-    borderColor: colors.oroHairline,
     backgroundColor: colors.bgCard,
   },
-  comingTextCol: { flex: 1, gap: 2 },
-  // Contenedor del astro: aloja el resplandor (absoluto, detrás) + la estrella.
-  // Más ancho/alto que la estrella para que el glow respire alrededor.
-  comingStar: {
-    width: 84,
-    height: 84,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  comingEyebrow: {
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.tinyLabel,
-    letterSpacing: typography.letterSpacing.uppercaseTight,
-    textTransform: 'uppercase',
-    color: colors.niebla,
-  },
-  comingName: {
-    fontFamily: typography.uiSemi,
-    fontSize: typography.sizes.bodyLarge,
-    color: colors.oroLeche,
-  },
-  comingRole: {
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
+  howText: {
+    flex: 1,
+    fontFamily: typography.uiMedium,
     fontSize: typography.sizes.body,
+    lineHeight: 18,
     color: colors.bone,
   },
-  // Cierre de largo plazo — la segunda capa (el signo se revela con el tiempo),
-  // voz de coach (serif italic), separado por un hairline oro del resto.
   // Preloader invisible — 1×1, fuera de layout, solo para calentar el caché.
   preloader: { position: 'absolute', width: 1, height: 1, opacity: 0 },
 })

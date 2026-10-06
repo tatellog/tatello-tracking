@@ -40,7 +40,18 @@ import { PatternReveal } from '@/features/patterns'
 import type { PatternType } from '@/features/patterns/logic'
 import { useCycleSealInvite } from '@/features/notifications/hooks'
 import { TransformationReveal, useRevelationOrchestrator } from '@/features/revelations'
-import { EmblemFramePreloader, TuEmblemaModal, useTransformProgress } from '@/features/emblem'
+import {
+  averagePointsPerDay,
+  dayEvidence,
+  EmblemFramePreloader,
+  EmblemNewPill,
+  evidencePhrase,
+  TuEmblemaModal,
+  useNewEmblemFrame,
+  useTransformProgress,
+} from '@/features/emblem'
+import { frameIndexFor } from '@/features/tabs/components/constellation/RevealedEmblem'
+import { GLASS_ML, useWaterGoal } from '@/features/water/useWaterGoal'
 import { useRecentWorkoutDates } from '@/features/progress/hooks'
 import { useRestToday, useSetRestForDate, useSetRestToday } from '@/features/rest/hooks'
 import { useSleepLog } from '@/features/sleep/hooks'
@@ -530,6 +541,22 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
     !viewingPast && ctx.meal_count_today >= 1 && !revelation && !tuEmblemaOpen,
   )
   const heroPct = figureCount > 0 ? Math.round((trainedThisMonth / figureCount) * 100) : 0
+  // Legibilidad del reveal (dueña 6 oct 2026, sin tocar su lógica): qué de hoy
+  // ya suma, a qué ritmo va (7 días cerrados, los vacíos cuentan 0) y el aviso
+  // cuando el arte avanza un cuadro. Misma vara que fn_transform_points.
+  const { goalMl: waterGoalMl } = useWaterGoal()
+  const evidenceTargets = {
+    calorieTarget: ctx.targets?.calories ?? null,
+    proteinTarget: ctx.targets?.protein_g ?? null,
+    waterGoalGlasses: Math.max(1, Math.round(waterGoalMl / GLASS_ML)),
+  }
+  const todayEvidence = dayEvidence(todaySignals.data, evidenceTargets)
+  const recentDays = lastClosedDays(todayIsoLocal, 7).map(
+    (d) => (monthSignals.data ?? []).find((r) => r.day === d) ?? {},
+  )
+  const pointsPerDay = averagePointsPerDay(recentDays, evidenceTargets)
+  const newFrame = useNewEmblemFrame(frameIndexFor(emblemProgress))
+  const signTitle = signLabel.charAt(0).toUpperCase() + signLabel.slice(1).toLowerCase()
   const heroPress = usePressFeedback()
   // Estrellas con nombre ya encendidas + la que sigue — derivadas de la
   // secuencia REAL de la constelación (las líneas se intercalan), así el modal
@@ -990,6 +1017,7 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
                 onPress={() => {
                   heroPress.triggerHaptic()
                   setTuEmblemaOpen(true)
+                  newFrame.markSeen()
                   track('hoy_constellation_opened', {
                     trained: trainedThisMonth,
                     total: figureCount,
@@ -1026,6 +1054,17 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
                   </View>
                 </Animated.View>
               </Pressable>
+              {newFrame.fresh && !viewingPast ? (
+                <EmblemNewPill
+                  signTitle={signTitle}
+                  cause={todayEvidence.length > 0 ? evidencePhrase(todayEvidence) : null}
+                  onPress={() => {
+                    setTuEmblemaOpen(true)
+                    newFrame.markSeen()
+                    track('hoy_emblem_new_frame_opened', { pct: emblemProgress })
+                  }}
+                />
+              ) : null}
             </Animated.View>
 
             <Animated.View
@@ -1108,6 +1147,8 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
           nextStar={nextStar}
           daysInOrbit={daysInOrbit}
           completedOn={figureCompletedOn(month.cells, figureCount)}
+          todayEvidence={todayEvidence}
+          pointsPerDay={pointsPerDay}
         />
         <NotifyOfferSheet
           visible={notifyOffer.visible}
@@ -1345,4 +1386,14 @@ function figureCompletedOn(
     }
   }
   return null
+}
+
+/** Los `n` días calendario anteriores a `today` (YYYY-MM-DD), sin incluirlo. */
+function lastClosedDays(today: string, n: number): string[] {
+  const base = new Date(`${today}T00:00:00Z`)
+  return Array.from({ length: n }, (_, i) => {
+    const d = new Date(base)
+    d.setUTCDate(d.getUTCDate() - (i + 1))
+    return d.toISOString().slice(0, 10)
+  })
 }
