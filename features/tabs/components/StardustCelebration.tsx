@@ -221,11 +221,18 @@ export function StardustCelebration({
     return [{ scale: 0.2 + 0.8 * (1 - Math.pow(1 - p, 3)) }]
   })
 
+  // Sigue a la cámara: si la página se mueve mientras corre, toda la capa se
+  // desplaza igual (origen y emblema son contenido de la página).
+  const scrollSV = payload.scrollY
+  const scroll0 = payload.scrollY0 ?? 0
+  const follow = useDerivedValue(() => [{ translateY: scrollSV ? scroll0 - scrollSV.value : 0 }])
+
   // "Stelar encontró algo": al final, solo si esta tanda cruzó una etapa.
   const pillStyle = useAnimatedStyle(() => {
     const v = (t.value - lastSuck - 0.3) / 0.5
     const o = v < 0 ? 0 : v > 1 ? 1 : v
-    return { opacity: o, transform: [{ translateY: (1 - o) * 8 }] }
+    const dy = scrollSV ? scroll0 - scrollSV.value : 0
+    return { opacity: o, transform: [{ translateY: (1 - o) * 8 + dy }] }
   })
 
   return (
@@ -238,57 +245,67 @@ export function StardustCelebration({
     >
       {origin ? (
         <Canvas style={StyleSheet.absoluteFill} pointerEvents="none">
-          <Group opacity={veil}>
-            <Circle cx={g.cx} cy={g.cy} r={g.r * 0.85}>
-              <RadialGradient
-                c={vec(g.cx, g.cy)}
-                r={g.r * 0.85}
-                colors={['rgba(255,236,200,0.16)', 'rgba(246,217,160,0.08)', 'rgba(232,184,114,0)']}
-                positions={[0, 0.6, 1]}
-              />
-            </Circle>
-          </Group>
-          <Group opacity={breath} origin={vec(g.cx, g.cy)} transform={breathScale}>
-            <Circle cx={g.cx} cy={g.cy} r={g.r * 0.85}>
-              <RadialGradient
-                c={vec(g.cx, g.cy)}
-                r={g.r * 0.85}
-                colors={['rgba(255,240,214,0.5)', 'rgba(246,217,160,0.22)', 'rgba(232,184,114,0)']}
-                positions={[0, 0.5, 1]}
-              />
-            </Circle>
-          </Group>
-          <Path path={auras} color={HAZE} opacity={0.22}>
-            <BlurMask blur={9} style="normal" />
-          </Path>
-          <Path
-            path={trails}
-            color={HAZE}
-            style="stroke"
-            strokeWidth={6}
-            opacity={0.08}
-            strokeCap="round"
-            strokeJoin="round"
-          >
-            <BlurMask blur={4} style="normal" />
-          </Path>
-          <Path
-            path={trails}
-            color={HAZE}
-            style="stroke"
-            strokeWidth={0.9}
-            opacity={0.4}
-            strokeCap="round"
-            strokeJoin="round"
-          />
-          <Path path={gold} color={TONE_COLOR[0]} />
-          <Path path={champagne} color={TONE_COLOR[1]} />
-          <Path path={cream} color={TONE_COLOR[2]} />
-          <Path path={sparks} color={SPARK_COLOR} />
-          <Group opacity={glint}>
-            <Circle cx={g.cx} cy={g.cy} r={10} color={SPARK_COLOR} opacity={0.6}>
-              <BlurMask blur={8} style="normal" />
-            </Circle>
+          <Group transform={follow}>
+            <Group opacity={veil}>
+              <Circle cx={g.cx} cy={g.cy} r={g.r * 0.85}>
+                <RadialGradient
+                  c={vec(g.cx, g.cy)}
+                  r={g.r * 0.85}
+                  colors={[
+                    'rgba(255,236,200,0.16)',
+                    'rgba(246,217,160,0.08)',
+                    'rgba(232,184,114,0)',
+                  ]}
+                  positions={[0, 0.6, 1]}
+                />
+              </Circle>
+            </Group>
+            <Group opacity={breath} origin={vec(g.cx, g.cy)} transform={breathScale}>
+              <Circle cx={g.cx} cy={g.cy} r={g.r * 0.85}>
+                <RadialGradient
+                  c={vec(g.cx, g.cy)}
+                  r={g.r * 0.85}
+                  colors={[
+                    'rgba(255,240,214,0.5)',
+                    'rgba(246,217,160,0.22)',
+                    'rgba(232,184,114,0)',
+                  ]}
+                  positions={[0, 0.5, 1]}
+                />
+              </Circle>
+            </Group>
+            <Path path={auras} color={HAZE} opacity={0.22}>
+              <BlurMask blur={9} style="normal" />
+            </Path>
+            <Path
+              path={trails}
+              color={HAZE}
+              style="stroke"
+              strokeWidth={6}
+              opacity={0.08}
+              strokeCap="round"
+              strokeJoin="round"
+            >
+              <BlurMask blur={4} style="normal" />
+            </Path>
+            <Path
+              path={trails}
+              color={HAZE}
+              style="stroke"
+              strokeWidth={0.9}
+              opacity={0.4}
+              strokeCap="round"
+              strokeJoin="round"
+            />
+            <Path path={gold} color={TONE_COLOR[0]} />
+            <Path path={champagne} color={TONE_COLOR[1]} />
+            <Path path={cream} color={TONE_COLOR[2]} />
+            <Path path={sparks} color={SPARK_COLOR} />
+            <Group opacity={glint}>
+              <Circle cx={g.cx} cy={g.cy} r={10} color={SPARK_COLOR} opacity={0.6}>
+                <BlurMask blur={8} style="normal" />
+              </Circle>
+            </Group>
           </Group>
         </Canvas>
       ) : null}

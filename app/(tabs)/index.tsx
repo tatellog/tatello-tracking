@@ -9,6 +9,7 @@ import Animated, {
   FadeIn,
   FadeInDown,
   LinearTransition,
+  useAnimatedScrollHandler,
   useReducedMotion,
   useSharedValue,
 } from 'react-native-reanimated'
@@ -200,6 +201,14 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
   // comidas) leen `vctx`. La constelación/mes/racha siguen con `ctx` (hoy real),
   // así nada de "hoy" se rompe al navegar al pasado.
   const [selectedDate, setSelectedDate] = useState<string>(ctx.date)
+  // Cambio de día (medianoche): si estabas en "hoy", Hoy avanza al día nuevo.
+  // Antes el día visto se quedaba en el anterior y aparecía "Estás en el 5"
+  // sin haberlo elegido. Si estabas viendo otro día a propósito, se respeta.
+  const [prevToday, setPrevToday] = useState(ctx.date)
+  if (prevToday !== ctx.date) {
+    setPrevToday(ctx.date)
+    if (selectedDate === prevToday) setSelectedDate(ctx.date)
+  }
   const viewingPast = selectedDate !== ctx.date
   const viewedBriefQ = useBriefContext(viewingPast ? selectedDate : undefined)
   const vctx: BriefContext = viewingPast ? (viewedBriefQ.data ?? ctx) : ctx
@@ -264,6 +273,12 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
   }, [])
 
   const scrollRef = useRef<ScrollView>(null)
+  // El scroll de Hoy en el hilo de UI (sin eventos al JS): el polvo de
+  // estrellas lo lee para seguir al emblema si te mueves mientras corre.
+  const scrollY = useSharedValue(0)
+  const onScrollUI = useAnimatedScrollHandler((e) => {
+    scrollY.value = e.contentOffset.y
+  })
   // Offsets de las secciones a las que llega un deep-link desde Órbita
   // ("Todavía no vimos → registrar"): los anillos de macros y las comidas.
   const macrosY = useRef(0)
@@ -732,7 +747,7 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
               await AsyncStorage.setItem(key, String(stage)).catch(() => {})
             }
           }
-          emitStardust({ ox, oy, cx, cy, r, discovered })
+          emitStardust({ ox, oy, cx, cy, r, discovered, scrollY, scrollY0: scrollY.value })
         })()
       }
       const card = mealCardRef.current
@@ -827,8 +842,10 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
       <View style={styles.screen}>
         <SkyBackground />
         <SafeAreaView style={styles.safe} edges={['top']}>
-          <ScrollView
-            ref={scrollRef}
+          <Animated.ScrollView
+            ref={scrollRef as never}
+            onScroll={onScrollUI}
+            scrollEventThrottle={16}
             contentContainerStyle={styles.content}
             showsVerticalScrollIndicator={false}
             onScrollBeginDrag={beginScroll}
@@ -1071,7 +1088,7 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
                   la pregunta del día y el peso no vive en Hoy. */}
               <MacroRings ctx={vctx} />
             </Animated.View>
-          </ScrollView>
+          </Animated.ScrollView>
         </SafeAreaView>
         {/* El flash dorado full-screen vive global en el (tabs) layout
             (CelebrationOverlay) para cubrir también la tab bar. */}

@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
+import { AppState } from 'react-native'
 
 import { queryKeys } from '@/lib/queryKeys'
 import { todayInTimezone } from '@/lib/time'
@@ -34,14 +35,23 @@ export function useOrbitDayRollover(): void {
   const dayRef = useRef(todayInTimezone())
   const [, force] = useState(0)
   useEffect(() => {
-    const id = setInterval(() => {
+    const check = () => {
       const today = todayInTimezone()
       if (today !== dayRef.current) {
         dayRef.current = today
         force((n) => n + 1)
       }
-    }, 60 * 1000)
-    return () => clearInterval(id)
+    }
+    const id = setInterval(check, 60 * 1000)
+    // iOS pausa el intervalo en segundo plano: al volver la app al frente se
+    // revisa de inmediato (si no, hasta un minuto con el día viejo).
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') check()
+    })
+    return () => {
+      clearInterval(id)
+      sub.remove()
+    }
   }, [])
 }
 

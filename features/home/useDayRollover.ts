@@ -1,5 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
+import { AppState } from 'react-native'
 
 import { queryKeys } from '@/lib/queryKeys'
 
@@ -23,6 +24,11 @@ function todayLocalIso(): string {
  *
  * Cheap: a single setInterval, no tick on every render. Cleaned up
  * on unmount so HMR / nav transitions don't leak timers.
+ *
+ * También revisa AL MONTAR y al VOLVER la app al frente (6 oct 2026): iOS
+ * pausa el intervalo en segundo plano, así que al abrir la app pasada la
+ * medianoche Hoy seguía hasta un minuto con el día viejo, y una comida
+ * registrada en ese lapso caía en el día nuevo sin verse.
  */
 export function useDayRollover(currentDate: string | undefined) {
   const qc = useQueryClient()
@@ -34,7 +40,14 @@ export function useDayRollover(currentDate: string | undefined) {
         qc.invalidateQueries({ queryKey: queryKeys.brief.all })
       }
     }
+    tick()
     const id = setInterval(tick, ONE_MINUTE_MS)
-    return () => clearInterval(id)
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') tick()
+    })
+    return () => {
+      clearInterval(id)
+      sub.remove()
+    }
   }, [currentDate, qc])
 }
