@@ -78,6 +78,7 @@ export const SkiaAtmosphere = memo(function SkiaAtmosphere({
   litKeys,
   reduce,
   reaction = null,
+  innerGlow = 0,
 }: {
   t: SharedValue<number>
   drift: SharedValue<number>
@@ -91,6 +92,9 @@ export const SkiaAtmosphere = memo(function SkiaAtmosphere({
   reduce: boolean
   /** Hero vivo (V-13): reacción en curso a un registro; null = reposo. */
   reaction?: HeroReaction | null
+  /** Polvo de estrellas: brillo interno del emblema (0..1), rumbo al
+   *  siguiente hallazgo de Descubre. 0 = sin capa. */
+  innerGlow?: number
 }) {
   const scale = useMemo(() => [{ scale: k }], [k])
   return (
@@ -120,6 +124,7 @@ export const SkiaAtmosphere = memo(function SkiaAtmosphere({
           )}
           <SkiaAmbientGlow cx={W / 2} cy={H / 2} />
           <SkiaNebula ax={ax} ay={ay} drift={drift} />
+          {innerGlow > 0 ? <SkiaInnerGlow level={innerGlow} /> : null}
           {reduce ? null : <SkiaCosmicDust t={t} />}
           {/* Hero vivo (V-13): la reacción a un registro, montada solo mientras
               corre (≈1 s). Va dentro de la máscara (su centro es opaco) y
@@ -329,6 +334,28 @@ function SkiaAmbientGlow({ cx, cy }: { cx: number; cy: number }) {
           />
         )
       })}
+    </Group>
+  )
+}
+
+/* ── Brillo interno (polvo de estrellas) ─────────────────────────────
+ * La luz que el emblema guarda de las estrellas que se tragó: un resplandor
+ * cálido detrás del arte, más presente mientras Descubre se acerca a su
+ * siguiente hallazgo. Colores estáticos; solo cambia la opacidad (prop). */
+const INNER_GLOW_R = W * 0.405 * 0.82
+function SkiaInnerGlow({ level }: { level: number }) {
+  const cx = W / 2
+  const cy = H * 0.505
+  return (
+    <Group opacity={level}>
+      <Circle cx={cx} cy={cy} r={INNER_GLOW_R}>
+        <RadialGradient
+          c={vec(cx, cy)}
+          r={INNER_GLOW_R}
+          colors={['rgba(255,232,196,0.28)', 'rgba(232,184,114,0.12)', 'rgba(232,184,114,0)']}
+          positions={[0, 0.45, 1]}
+        />
+      </Circle>
     </Group>
   )
 }

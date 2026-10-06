@@ -16,7 +16,12 @@ import {
   useWeeklyReadingInvite,
 } from '@/features/notifications/hooks'
 import { useAppleHealthSync } from '@/features/wearables/hooks'
-import { AppTabBar, CelebrationOverlay, UndoMealToast } from '@/features/tabs/components'
+import {
+  AppTabBar,
+  CelebrationOverlay,
+  StardustOverlay,
+  UndoMealToast,
+} from '@/features/tabs/components'
 import { colors } from '@/theme'
 
 /* Tab glyphs. Custom vector illustrations from `assets/icons/`:
@@ -164,6 +169,8 @@ export default function TabsLayout() {
       {/* Celebración full-screen ("Entrené") — DESPUÉS de <Tabs> para que el
           flash dorado cubra toda la pantalla, incluyendo la barra de tabs. */}
       <CelebrationOverlay />
+      {/* Comida registrada → polvo de estrellas al emblema (sutil, no tapa). */}
+      <StardustOverlay />
       {/* Deshacer del re-log de 1 tap — global: sobrevive al cierre del sheet. */}
       <UndoMealToast />
       {/* "¿Le atiné?" del scan (M1) — global: recibe a la usuaria al volver. */}

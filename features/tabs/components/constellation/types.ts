@@ -65,6 +65,9 @@ export type Props = {
    *  padre vía `useHeroReaction`). null = en reposo. Se ignora sin foco y
    *  bajo reduce-motion. */
   reaction?: HeroReaction | null
+  /** Polvo de estrellas: brillo interno del emblema (0..1) rumbo al siguiente
+   *  hallazgo de Descubre. 0/undefined = sin capa. */
+  innerGlow?: number
   /** Dónde está la estrella alfa (el corazón de la figura) en px, relativo al
    *  lienzo cuadrado de la constelación, y el lado del lienzo. La celebración
    *  full-screen de Hoy la usa para que el oro caiga justo en esa estrella. */
