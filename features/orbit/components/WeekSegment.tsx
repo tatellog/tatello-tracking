@@ -1,6 +1,5 @@
-import { BlurView } from 'expo-blur'
 import { useMemo, useState, type ReactNode } from 'react'
-import { Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native'
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated'
 
 import Svg, {
@@ -49,6 +48,7 @@ import {
 import { consumeWeekFocus } from '../pending-week-focus'
 import { stepsRhythm } from '../steps'
 import { useWeeklyReading } from '../weekly-reading-hooks'
+import { StelarModal } from '@/components/ui/StelarModal'
 import { EmptySegmentCard } from './EmptySegmentCard'
 import { WeekOrbitGalaxy } from './WeekOrbitGalaxy'
 import { WeekProgressHero } from './WeekProgressHero'
@@ -708,56 +708,43 @@ function EvidenceSheet({
   onClose: () => void
 }) {
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.modalBackdrop} onPress={onClose}>
-        <BlurView intensity={32} tint="dark" style={StyleSheet.absoluteFill} pointerEvents="none" />
-        <View style={[StyleSheet.absoluteFill, styles.modalScrim]} pointerEvents="none" />
-        <Pressable style={styles.modalCard} onPress={() => {}}>
-          <Text style={styles.modalEyebrow}>La evidencia</Text>
-          <View style={styles.modalTitleRow}>
-            <View
-              style={[
-                styles.modalTitleDot,
-                { backgroundColor: discoveryColor(discovery.archetype) },
-              ]}
-            />
-            <Text style={styles.modalTitle}>{discovery.title}</Text>
-          </View>
-          {discovery.snapshot ? (
-            // Foto del día: un solo registro esta semana → su instantánea, no
-            // seis conteos de "1 día".
-            <View style={styles.snapBlock}>
-              <Text style={styles.snapDay}>
-                {capitalize(discovery.snapshot.weekdayLabel)} registraste:
-              </Text>
-              <Text style={styles.snapItems}>{discovery.snapshot.items.join('  ·  ')}</Text>
-            </View>
-          ) : (
-            <View style={styles.evList}>
-              {discovery.evidence.map((e) => (
-                <View key={e.key} style={styles.evRow}>
-                  <Text style={styles.evCheck}>✓</Text>
-                  <Text style={styles.evText}>{e.text}</Text>
-                </View>
-              ))}
-            </View>
-          )}
-          <Text style={styles.modalCaption}>
-            {discovery.snapshot
-              ? 'Todo esto salió de tu registro de ese día.'
-              : 'Todo esto salió de tus registros de la semana.'}
+    <StelarModal
+      visible={visible}
+      onClose={onClose}
+      kicker="La evidencia"
+      kickerColor={colors.niebla}
+      icon={
+        <View
+          style={[styles.modalIconDot, { backgroundColor: discoveryColor(discovery.archetype) }]}
+        />
+      }
+      title={discovery.title}
+    >
+      {discovery.snapshot ? (
+        // Foto del día: un solo registro esta semana → su instantánea, no
+        // seis conteos de "1 día".
+        <View style={styles.snapBlock}>
+          <Text style={styles.snapDay}>
+            {capitalize(discovery.snapshot.weekdayLabel)} registraste:
           </Text>
-          <Pressable
-            onPress={onClose}
-            hitSlop={10}
-            accessibilityRole="button"
-            style={styles.modalCloseBtn}
-          >
-            <Text style={styles.modalClose}>Cerrar</Text>
-          </Pressable>
-        </Pressable>
-      </Pressable>
-    </Modal>
+          <Text style={styles.snapItems}>{discovery.snapshot.items.join('  ·  ')}</Text>
+        </View>
+      ) : (
+        <View style={styles.evList}>
+          {discovery.evidence.map((e) => (
+            <View key={e.key} style={styles.evRow}>
+              <Text style={styles.evCheck}>✓</Text>
+              <Text style={styles.evText}>{e.text}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+      <Text style={styles.modalCaption}>
+        {discovery.snapshot
+          ? 'Todo esto salió de tu registro de ese día.'
+          : 'Todo esto salió de tus registros de la semana.'}
+      </Text>
+    </StelarModal>
   )
 }
 
@@ -1235,10 +1222,6 @@ const styles = StyleSheet.create({
     lineHeight: 23,
     color: colors.leche,
   },
-  // El nombre de la dimensión dentro de una fila (silencioso) — su color.
-  listEm: {
-    fontFamily: typography.uiSemi,
-  },
   // ── §4 Lo que podemos confirmar (✓ hechos) ────────────────────────
   // §5 en susurro: honesto y humilde, pero tenue (niebla) y sin eyebrow, para
   // que no compita con los hallazgos ni se lea como "sigue haciendo tarea".
@@ -1248,35 +1231,6 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.bodyLarge,
     lineHeight: 20,
     color: colors.niebla,
-  },
-  // ── §6 La semana día por día (timeline con etiquetas) ─────────────
-  tlList: {
-    gap: 10,
-  },
-  tlRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    minHeight: 26,
-  },
-  tlDay: {
-    width: 88,
-    fontFamily: typography.uiSemi,
-    fontSize: typography.sizes.label,
-    color: colors.bone,
-  },
-  tlDayToday: {
-    color: colors.magenta,
-    fontFamily: typography.uiBold,
-  },
-  tlDayFuture: {
-    color: colors.bruma,
-  },
-  tlTags: {
-    flex: 1,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
   },
   tlTag: {
     paddingHorizontal: 9,
@@ -1393,111 +1347,8 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.label,
     color: colors.leche,
   },
-  // ── Tira de fechas (picker de día) — distinta a la línea de presencia ──
-  stripRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 4,
-  },
-  stripCol: {
-    alignItems: 'center',
-    gap: 8,
-  },
-  stripLetter: {
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.micro,
-    letterSpacing: 0.5,
-    color: colors.niebla,
-  },
-  stripLetterToday: {
-    color: colors.magenta,
-  },
-  stripLetterFuture: {
-    color: colors.bruma,
-  },
-  stripPill: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stripPillToday: {
-    backgroundColor: colors.magenta,
-  },
-  stripNum: {
-    fontFamily: typography.uiSemi,
-    fontSize: typography.sizes.ui,
-    color: colors.leche,
-  },
-  stripNumToday: {
-    fontFamily: typography.uiBold,
-    color: colors.leche,
-  },
-  // Día sin registro → número atenuado (presencia sutil, sin duplicar los ✓).
-  stripNumAbsent: {
-    color: colors.niebla,
-  },
-  stripNumFuture: {
-    color: colors.bruma,
-  },
-  // Hint bajo la tira de 7 días.
-  stripHint: {
-    marginTop: 10,
-    fontFamily: typography.ui,
-    fontSize: typography.sizes.label,
-    color: colors.niebla,
-    marginLeft: 2,
-  },
   // ── Modal de evidencia ────────────────────────────────────────────
-  modalBackdrop: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 28,
-  },
-  modalScrim: {
-    backgroundColor: 'rgba(10, 6, 8, 0.55)',
-  },
-  modalCard: {
-    width: '100%',
-    borderRadius: 24,
-    paddingVertical: 26,
-    paddingHorizontal: 24,
-    backgroundColor: colors.bgCard2,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.oroHairline,
-    shadowColor: colors.sombra,
-    shadowOpacity: 0.5,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: 12 },
-  },
-  modalEyebrow: {
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.tinyLabel,
-    letterSpacing: 2,
-    textTransform: 'uppercase',
-    color: colors.niebla,
-  },
-  modalTitleRow: {
-    marginTop: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 9,
-  },
-  modalTitleDot: {
-    width: 9,
-    height: 9,
-    borderRadius: 4.5,
-  },
-  modalTitle: {
-    flex: 1,
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.segmentTitle,
-    lineHeight: 27,
-    color: colors.leche,
-  },
+  modalIconDot: { width: 10, height: 10, borderRadius: 5 },
   evList: {
     marginTop: 18,
     gap: 12,
@@ -1544,21 +1395,6 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.label,
     lineHeight: 18,
     color: colors.niebla,
-  },
-  modalCloseBtn: {
-    marginTop: 22,
-    alignSelf: 'center',
-    paddingVertical: 13,
-    paddingHorizontal: 28,
-    borderRadius: 999,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.hairlineStrong,
-  },
-  modalClose: {
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.body,
-    letterSpacing: 0.3,
-    color: colors.bone,
   },
   // ── Volver arriba (fin del recorrido) ────────────────────────────
   backTop: {

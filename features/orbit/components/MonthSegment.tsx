@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Dimensions,
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -20,7 +19,6 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated'
 import Svg, { Circle, Defs, Path, RadialGradient, Stop } from 'react-native-svg'
-import { BlurView } from 'expo-blur'
 import { useIsFocused } from '@react-navigation/native'
 import { LinearGradient } from 'expo-linear-gradient'
 import * as Haptics from 'expo-haptics'
@@ -73,6 +71,7 @@ import {
   type WinningCombo as WinningComboData,
 } from '../month-built'
 import { isDeficitDay } from '../deficit'
+import { StelarModal } from '@/components/ui/StelarModal'
 import { evidenceChip, evidenceLook } from '../evidence-highlight'
 import { consumeOrbitEvidence } from '../pending-segment'
 import { weeklyMovementLever } from '../week-orbit-logic'
@@ -2150,56 +2149,39 @@ function EvidenceModal({
   const look = evidenceLook(pattern?.id, titleColor)
   const chip = ev ? evidenceChip(pattern?.id, shown, ev.unit) : null
   return (
-    <Modal visible={pattern != null} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.modalBackdrop} onPress={onClose}>
-        {/* Fondo difuminado: la pantalla detrás se va a desenfoque, el modal
-            flota. El scrim cálido encima da separación y es el respaldo si en
-            algún Android el BlurView no rinde. Ambos pointerEvents none → el tap
-            afuera sigue cerrando vía el Pressable contenedor. */}
-        <BlurView intensity={32} tint="dark" style={StyleSheet.absoluteFill} pointerEvents="none" />
-        <View style={[StyleSheet.absoluteFill, styles.modalScrim]} pointerEvents="none" />
-        <Pressable style={styles.modalCard} onPress={() => {}}>
-          {pattern && ev ? (
-            <View style={styles.evStack}>
-              <EvidenceHeader look={look} />
-              <Text style={styles.evTitle}>{pattern.title}</Text>
-              {pattern.weekdayShape ? (
-                // Forma por día de semana: la usuaria VE sus picos y valles + el
-                // dato traducido en plano ("de cada 10 días entre semana sostienes 5").
-                <>
-                  <WeekdayShapeChart shape={pattern.weekdayShape} />
-                  {pattern.why ? <Text style={styles.evWhy}>{pattern.why}</Text> : null}
-                </>
-              ) : (
-                <>
-                  <EvidenceComparison bars={shown} unit={ev.unit} accent={look.accent} />
-                  {chip ? <EvidenceChip text={chip} color={look.accent} /> : null}
-                  {/* "Por qué importa" — el lever que la usuaria puede mover. */}
-                  {pattern.why ? <Text style={styles.evWhy}>{pattern.why}</Text> : null}
-                  {/* Qué se midió + las fechas concretas que anclan el conteo. */}
-                  <Text style={styles.evMeta}>{ev.caption}</Text>
-                  {pattern.dates && pattern.dates.length > 0 ? (
-                    <Text style={styles.modalDates}>{formatDates(pattern.dates)}</Text>
-                  ) : null}
-                  {zeros.length > 0 ? (
-                    <Text style={styles.evMeta}>
-                      {zeros.map((z) => z.label).join(' · ')}: aún sin registro este mes.
-                    </Text>
-                  ) : null}
-                </>
-              )}
-              <Pressable
-                onPress={onClose}
-                accessibilityRole="button"
-                style={({ pressed }) => [styles.evDone, pressed && { opacity: 0.7 }]}
-              >
-                <Text style={styles.evDoneText}>Listo</Text>
-              </Pressable>
-            </View>
-          ) : null}
-        </Pressable>
-      </Pressable>
-    </Modal>
+    <StelarModal visible={pattern != null} onClose={onClose}>
+      {pattern && ev ? (
+        <View style={styles.evStack}>
+          <EvidenceHeader look={look} />
+          <Text style={styles.evTitle}>{pattern.title}</Text>
+          {pattern.weekdayShape ? (
+            // Forma por día de semana: la usuaria VE sus picos y valles + el
+            // dato traducido en plano ("de cada 10 días entre semana sostienes 5").
+            <>
+              <WeekdayShapeChart shape={pattern.weekdayShape} />
+              {pattern.why ? <Text style={styles.evWhy}>{pattern.why}</Text> : null}
+            </>
+          ) : (
+            <>
+              <EvidenceComparison bars={shown} unit={ev.unit} accent={look.accent} />
+              {chip ? <EvidenceChip text={chip} color={look.accent} /> : null}
+              {/* "Por qué importa" — el lever que la usuaria puede mover. */}
+              {pattern.why ? <Text style={styles.evWhy}>{pattern.why}</Text> : null}
+              {/* Qué se midió + las fechas concretas que anclan el conteo. */}
+              <Text style={styles.evMeta}>{ev.caption}</Text>
+              {pattern.dates && pattern.dates.length > 0 ? (
+                <Text style={styles.modalDates}>{formatDates(pattern.dates)}</Text>
+              ) : null}
+              {zeros.length > 0 ? (
+                <Text style={styles.evMeta}>
+                  {zeros.map((z) => z.label).join(' · ')}: aún sin registro este mes.
+                </Text>
+              ) : null}
+            </>
+          )}
+        </View>
+      ) : null}
+    </StelarModal>
   )
 }
 
@@ -2321,79 +2303,65 @@ function RevealEvidenceModal({
 }) {
   const color = detail ? revealColor(detail.colorKey) : colors.oro
   return (
-    <Modal visible={detail != null} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.modalBackdrop} onPress={onClose}>
-        <BlurView intensity={32} tint="dark" style={StyleSheet.absoluteFill} pointerEvents="none" />
-        <View style={[StyleSheet.absoluteFill, styles.modalScrim]} pointerEvents="none" />
-        <Pressable style={styles.modalCard} onPress={() => {}}>
-          {detail ? (
-            <>
-              <Text style={styles.modalEyebrow}>La evidencia</Text>
-              <View style={styles.modalTitleRow}>
-                <View style={[styles.modalTitleDot, { backgroundColor: color }]} />
-                <Text style={styles.modalTitle}>{detail.label}</Text>
-              </View>
+    <StelarModal
+      visible={detail != null}
+      onClose={onClose}
+      kicker="La evidencia"
+      kickerColor={colors.niebla}
+      icon={<View style={[styles.modalIconDot, { backgroundColor: color }]} />}
+      title={detail?.label}
+    >
+      {detail ? (
+        <>
+          {/* Qué cuenta + el umbral/estado. */}
+          <Text style={styles.revCriterion}>{REVEAL_CRITERION[detail.key] ?? ''}</Text>
+          <Text style={styles.revThreshold}>
+            {detail.revealed
+              ? `Con ${detail.threshold} días ya cuenta como una constante. Este mes la tienes.`
+              : `Con ${detail.threshold} días ya cuenta como una constante.`}
+          </Text>
 
-              {/* Qué cuenta + el umbral/estado. */}
-              <Text style={styles.revCriterion}>{REVEAL_CRITERION[detail.key] ?? ''}</Text>
-              <Text style={styles.revThreshold}>
-                {detail.revealed
-                  ? `Con ${detail.threshold} días ya cuenta como una constante. Este mes la tienes.`
-                  : `Con ${detail.threshold} días ya cuenta como una constante.`}
-              </Text>
+          {/* La prueba: los días concretos. */}
+          <Text style={styles.revProofLabel}>Tus días</Text>
+          <RevealDaysGrid days={detail.days} color={color} today={today} />
 
-              {/* La prueba: los días concretos. */}
-              <Text style={styles.revProofLabel}>Tus días</Text>
-              <RevealDaysGrid days={detail.days} color={color} today={today} />
-
-              {/* Dirección dentro del mes (inicio vs final) como GLANCE: las 4
+          {/* Dirección dentro del mes (inicio vs final) como GLANCE: las 4
                   barras + la hairline de tu promedio hablan solas, sin verso que
                   las repita. `direction` se conserva solo como guarda de honestidad
                   (null = datos muy delgados → no dibujar barras ruidosas). */}
-              {detail.key === 'deficit' && detail.direction && detail.weeklyDeficit ? (
-                <WeekDeficitBars weeks={detail.weeklyDeficit} color={color} />
-              ) : null}
+          {detail.key === 'deficit' && detail.direction && detail.weeklyDeficit ? (
+            <WeekDeficitBars weeks={detail.weeklyDeficit} color={color} />
+          ) : null}
 
-              {/* "Lo que sostuviste" (solo déficit revelado, con intensidad) —
+          {/* "Lo que sostuviste" (solo déficit revelado, con intensidad) —
                   la CONCLUSIÓN que la usuaria pedía como "déficit total": la
                   intensidad diaria (kcal por debajo de la meta en SUS días), no
                   una suma gastable, + un verso que reencuadra del número al hecho
                   de volver. Reemplaza al rol para no duplicar cierre serif. */}
-              {detail.key === 'deficit' &&
-              detail.revealed &&
-              detail.avgOnDeficitDays != null &&
-              detail.avgOnDeficitDays > 0 ? (
-                <View style={styles.sustained}>
-                  <Text style={styles.sustainedEyebrow}>Lo que sostuviste</Text>
-                  <Text style={styles.sustainedLine}>
-                    Esos días tu déficit promedio fue de{' '}
-                    <Text style={styles.sustainedNum}>{detail.avgOnDeficitDays} kcal</Text>.
-                  </Text>
-                  <Text style={styles.sustainedVerse}>
-                    No es la suma lo que te acerca a bajar de peso. Es que volviste, una y otra vez.
-                  </Text>
-                </View>
-              ) : (
-                <Text style={styles.revRole}>
-                  {detail.revealed
-                    ? (REVEAL_ROLE[detail.key]?.on ?? '')
-                    : (REVEAL_ROLE[detail.key]?.off ?? '')}
-                </Text>
-              )}
-
-              <Pressable
-                onPress={onClose}
-                hitSlop={10}
-                accessibilityRole="button"
-                style={styles.modalCloseBtn}
-              >
-                <Text style={styles.modalClose}>Cerrar</Text>
-              </Pressable>
-            </>
-          ) : null}
-        </Pressable>
-      </Pressable>
-    </Modal>
+          {detail.key === 'deficit' &&
+          detail.revealed &&
+          detail.avgOnDeficitDays != null &&
+          detail.avgOnDeficitDays > 0 ? (
+            <View style={styles.sustained}>
+              <Text style={styles.sustainedEyebrow}>Lo que sostuviste</Text>
+              <Text style={styles.sustainedLine}>
+                Esos días tu déficit promedio fue de{' '}
+                <Text style={styles.sustainedNum}>{detail.avgOnDeficitDays} kcal</Text>.
+              </Text>
+              <Text style={styles.sustainedVerse}>
+                No es la suma lo que te acerca a bajar de peso. Es que volviste, una y otra vez.
+              </Text>
+            </View>
+          ) : (
+            <Text style={styles.revRole}>
+              {detail.revealed
+                ? (REVEAL_ROLE[detail.key]?.on ?? '')
+                : (REVEAL_ROLE[detail.key]?.off ?? '')}
+            </Text>
+          )}
+        </>
+      ) : null}
+    </StelarModal>
   )
 }
 
@@ -2729,7 +2697,6 @@ const styles = StyleSheet.create({
     borderColor: colors.bruma,
     transform: [{ rotate: '45deg' }],
   },
-  proofDiamondOn: { backgroundColor: colors.oroSoft, borderColor: colors.oroSoft },
   weekMeter: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   weekStars: { flexDirection: 'row', gap: 6 },
   weekStar: { fontSize: typography.sizes.displaySm, lineHeight: 28, color: colors.bruma },
@@ -2742,11 +2709,6 @@ const styles = StyleSheet.create({
   },
   weekNoteReached: { color: colors.oroLight },
   todayRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 14 },
-  todayLabel: {
-    fontFamily: typography.uiSemi,
-    fontSize: typography.sizes.label,
-    color: colors.niebla,
-  },
   todayItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   todayDot: { width: 8, height: 8, borderRadius: 4 },
   todayText: {
@@ -3396,65 +3358,7 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.body,
     color: colors.oroSoft,
   },
-  // ── Lo que aún no sabemos ─────────────────────────────────────
-  // Anillo vacío (○) — el espacio aún sin llenar, sin culpa.
-  // ── Frase final ───────────────────────────────────────────────
-  // ── Modal de evidencia ────────────────────────────────────────
-  modalBackdrop: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 28,
-  },
-  // Velo cálido sobre el blur (no negro plano): mantiene la temperatura de
-  // Stelar y oscurece lo justo para que el modal flote.
-  modalScrim: {
-    backgroundColor: 'rgba(10, 6, 8, 0.55)',
-  },
-  modalCard: {
-    width: '100%',
-    borderRadius: 24,
-    paddingVertical: 26,
-    paddingHorizontal: 24,
-    backgroundColor: colors.bgCard2,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.oroHairline,
-    // Elevación suave para que el modal se despegue del blur (iOS; en Android
-    // el blur + scrim ya dan separación).
-    shadowColor: colors.sombra,
-    shadowOpacity: 0.5,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: 12 },
-  },
-  modalEyebrow: {
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.tinyLabel,
-    letterSpacing: 2,
-    textTransform: 'uppercase',
-    color: colors.niebla,
-  },
-  // La misma estrella de la dimensión que viste en la lista te recibe en el
-  // modal (continuidad de identidad por color).
-  modalTitleRow: {
-    marginTop: 8,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 9,
-  },
-  modalTitleDot: {
-    marginTop: 9,
-    width: 9,
-    height: 9,
-    borderRadius: 4.5,
-  },
-  modalTitle: {
-    flex: 1,
-    // Hanken: el hallazgo es dato, no frase emocional.
-    fontFamily: typography.uiSemi,
-    fontSize: typography.sizes.heading,
-    lineHeight: 24,
-    color: colors.leche,
-  },
+  modalIconDot: { width: 10, height: 10, borderRadius: 5 },
   // ── Forma de tu semana (7 columnas) ──────────────────────────
   shapeWrap: {
     marginTop: 20,
@@ -3526,33 +3430,6 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.label,
     lineHeight: 17,
     color: colors.niebla,
-  },
-  evDone: {
-    marginTop: 4,
-    paddingVertical: 14,
-    borderRadius: 14,
-    alignItems: 'center',
-    backgroundColor: colors.bgCard,
-  },
-  evDoneText: {
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.ui,
-    color: colors.leche,
-  },
-  modalCloseBtn: {
-    marginTop: 20,
-    alignSelf: 'center',
-    paddingVertical: 13,
-    paddingHorizontal: 28,
-    borderRadius: 999,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.hairlineStrong,
-  },
-  modalClose: {
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.body,
-    letterSpacing: 0.3,
-    color: colors.bone,
   },
   // Chevron de "esto abre evidencia" en la fila del déficit (héroe).
   revChevron: {

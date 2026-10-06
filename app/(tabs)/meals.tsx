@@ -6,6 +6,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { track } from '@/lib/analytics'
 import { useMacroTargets, useMealsForDate } from '@/features/macros/hooks'
+import { useOrbitDayRollover } from '@/features/orbit/hooks'
 import { NutritionMoon } from '@/features/macros/components'
 import { useActiveLogDate } from '@/features/tabs/active-log-date'
 import {
@@ -49,7 +50,10 @@ function MealsBody() {
   )
   const router = useRouter()
   const insets = useSafeAreaInsets()
-  const today = useMemo(() => todayInTimezone(), [])
+  // Re-render al cruzar la medianoche + "hoy" fresco en cada render (antes
+  // memoizado desde que abrió la app, se quedaba en el día anterior).
+  useOrbitDayRollover()
+  const today = todayInTimezone()
   // Coherencia con el "modo ver día" (P1): si Hoy está anclado a un día pasado,
   // el resumen de macros de Comidas refleja ESE día (el resto —consistencia,
   // semana, estela— son rangos/historia y no cambian).

@@ -44,6 +44,7 @@ import {
 } from '@/features/onboarding/components'
 import { useProfile } from '@/features/profile/hooks'
 import { colors, typography } from '@/theme'
+import { SHEET_GRABBER, SHEET_SCRIM, SHEET_SURFACE } from '@/components/ui/StelarModal'
 
 const AnimatedEllipse = Animated.createAnimatedComponent(Ellipse)
 const AnimatedG = Animated.createAnimatedComponent(G)
@@ -674,7 +675,7 @@ const BaseNebulaWash = memo(function BaseNebulaWash({ clock }: { clock: SharedVa
 function HowCalculatedSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const insets = useSafeAreaInsets()
   return (
-    <Modal visible={visible} animationType="slide" transparent>
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={sheetStyles.backdrop}>
         <Pressable style={sheetStyles.scrim} onPress={onClose} />
         <View style={[sheetStyles.sheet, { paddingBottom: insets.bottom }]}>
@@ -841,24 +842,15 @@ const sheetStyles = StyleSheet.create({
   },
   scrim: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.55)',
+    backgroundColor: SHEET_SCRIM,
   },
   sheet: {
-    backgroundColor: colors.bgCard,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    borderWidth: 1,
-    borderBottomWidth: 0,
-    borderColor: colors.bruma,
     maxHeight: '80%',
+    ...SHEET_SURFACE,
   },
   grabber: {
-    alignSelf: 'center',
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.bruma,
     marginTop: 10,
+    ...SHEET_GRABBER,
   },
   content: {
     paddingHorizontal: 22,

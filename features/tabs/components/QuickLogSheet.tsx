@@ -63,6 +63,7 @@ import { useWearableWeights } from '@/features/wearables/hooks'
 import { IgnitionBurst, IGNITION_LIFETIME_MS } from './IgnitionBurst'
 import { MealCard } from './MealCard'
 import { WeightWheel } from './WeightWheel'
+import { SHEET_GRABBER, SHEET_SCRIM, SHEET_SURFACE } from '@/components/ui/StelarModal'
 
 type MealType = MealInput['meal_type']
 
@@ -313,7 +314,10 @@ const BACKFILL_MONTHS = [
 
 export function QuickLogSheet({ visible, onClose }: Props) {
   const router = useRouter()
-  const today = useMemo(() => todayInTimezone(), [])
+  // "Hoy" se calcula en CADA render (no memoizado): la hoja vive siempre en el
+  // tab bar, y congelado desde que abrió la app, pasada la medianoche creía que
+  // hoy era ayer → registrar viendo "ayer" escribía en el día nuevo (6 oct 2026).
+  const today = todayInTimezone()
   // Modo backfill: si Hoy está viendo un día pasado, COMIDA + AGUA se escriben a
   // ESE día (no a hoy). Periodo y peso se quedan en hoy (re-anclar el ciclo a un
   // día pasado distorsiona la predicción; el peso es la última medición).
@@ -323,7 +327,8 @@ export function QuickLogSheet({ visible, onClose }: Props) {
   // Mediodía local del día visto, por COMPONENTES (Hermes da Invalid Date al
   // parsear strings). Inline para no depender de un export cruzando módulos.
   const logConsumedAt = (): Date => {
-    if (!backfilling) return new Date()
+    // Se re-evalúa al registrar (no con el valor del último render).
+    if (activeLogDate == null || activeLogDate === todayInTimezone()) return new Date()
     const [y, m, d] = logDate.split('-').map(Number) as [number, number, number]
     return new Date(y, m - 1, d, 12, 0, 0)
   }
@@ -1025,7 +1030,7 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     // Darker scrim so the screen behind (e.g. the cycle ring) recedes and
     // the sheet is the clear focus.
-    backgroundColor: 'rgba(0,0,0,0.72)',
+    backgroundColor: SHEET_SCRIM,
   },
   anchor: {
     flex: 1,
@@ -1034,9 +1039,6 @@ const styles = StyleSheet.create({
   // No top hairline — the sheet separates from the scrim by its rounded
   // corners + a soft upward shadow, not a hard line.
   sheet: {
-    backgroundColor: colors.bgCard,
-    borderTopLeftRadius: 26,
-    borderTopRightRadius: 26,
     paddingHorizontal: 20,
     paddingTop: 12,
     paddingBottom: 34,
@@ -1045,6 +1047,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.4,
     shadowRadius: 16,
     elevation: 12,
+    ...SHEET_SURFACE,
   },
   // Cycle chip — full-width, oro, set apart at the bottom (eventual
   // action). Quiet in rest; reads as a celestial artifact, not a tracker.
@@ -1108,12 +1111,8 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
   },
   grabber: {
-    alignSelf: 'center',
-    width: 38,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.bruma,
     marginBottom: 14,
+    ...SHEET_GRABBER,
   },
   header: {
     flexDirection: 'row',

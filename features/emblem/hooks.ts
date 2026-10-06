@@ -107,3 +107,48 @@ export function useTransformProgressAsOf(asOf: string | null): {
     isLoading: query.isLoading,
   }
 }
+
+/*
+ * "Algo nuevo apareció en tu {signo}" (dueña 6 oct 2026: que se note cuando
+ * el emblema cambia). Guarda POR USUARIO el último frame del arte que ella ya
+ * vio; cuando el frame actual es mayor, `fresh` es true hasta que lo descarte
+ * o abra el modal. La primera vez (sin nada guardado) solo anota el frame: no
+ * avisa de algo que ya estaba ahí.
+ */
+const SEEN_FRAME_PREFIX = 'stelar.emblem.seen_frame'
+
+export function useNewEmblemFrame(frame: number): { fresh: boolean; markSeen: () => void } {
+  const userId = useSession().session?.user?.id ?? null
+  const key = userId ? `${SEEN_FRAME_PREFIX}:${userId}` : null
+  // undefined = aún hidratando; null = nunca guardado.
+  const [seen, setSeen] = useState<number | null | undefined>(undefined)
+  useEffect(() => {
+    let active = true
+    setSeen(undefined)
+    if (key == null) return
+    AsyncStorage.getItem(key)
+      .then((v) => {
+        if (!active) return
+        const n = v != null ? Number(v) : NaN
+        setSeen(Number.isFinite(n) ? n : null)
+      })
+      .catch(() => active && setSeen(null))
+    return () => {
+      active = false
+    }
+  }, [key])
+  // Primera vez: se anota el frame actual sin avisar.
+  useEffect(() => {
+    if (key == null || seen !== null || frame <= 0) return
+    setSeen(frame)
+    AsyncStorage.setItem(key, String(frame)).catch(() => {})
+  }, [key, seen, frame])
+
+  const fresh = typeof seen === 'number' && frame > seen
+  const markSeen = () => {
+    if (key == null || !fresh) return
+    setSeen(frame)
+    AsyncStorage.setItem(key, String(frame)).catch(() => {})
+  }
+  return { fresh, markSeen }
+}

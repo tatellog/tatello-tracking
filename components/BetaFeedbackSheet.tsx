@@ -13,6 +13,7 @@ import {
 
 import { requireUserId, supabase } from '@/lib/supabase'
 import { colors, radius, spacing, typography } from '@/theme'
+import { SHEET_SCRIM, SHEET_SURFACE } from '@/components/ui/StelarModal'
 
 /*
  * Beta feedback sheet — text input + send, captured against the
@@ -171,18 +172,14 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    backgroundColor: SHEET_SCRIM,
   },
   sheet: {
     marginTop: 'auto',
     paddingHorizontal: spacing.s5,
     paddingTop: spacing.s5,
     paddingBottom: spacing.s7,
-    backgroundColor: colors.bgCard,
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
-    borderTopWidth: 1,
-    borderColor: colors.hairlineStrong,
+    ...SHEET_SURFACE,
   },
   title: {
     fontFamily: typography.serifSemi,

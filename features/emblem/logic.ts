@@ -2,13 +2,13 @@
  * Emblema Celeste — la lógica PURA de transformación.
  *
  * Dos sistemas independientes conviven en el hero:
- *   · Constelación natal — disciplina física. Solo "Entrené", mensual,
- *     se reinicia. Responde "¿cuánto me moví este mes?" / "¿te moviste?".
+ *   · Constelación del mes — presencia. Cualquier día con registro enciende
+ *     una estrella; mensual, se reinicia. Responde "¿cuántos días estuve?".
  *   · Emblema Celeste — transformación personal. Persistente, nunca se
  *     reinicia, responde a la suma de hábitos. "¿En quién me estoy
  *     convirtiendo?" / "¿te cuidaste?".
- *   La constelación NO revela el emblema: un mes de puro gym llena la
- *   constelación pero revela el emblema solo moderadamente; un mes de
+ *   La constelación NO revela el emblema: un mes de solo registrar llena la
+ *   constelación pero revela el emblema poco; un mes de
  *   hábitos completos lo revela más. Intencional.
  *
  * Los PUNTOS son internos — la usuaria nunca ve puntos. SÍ ve el
@@ -169,4 +169,107 @@ export function dailyCoachLine(progress: number, daySeed: number, signLabel: str
 export function stageIndexForProgress(progress: number): number {
   if (!Number.isFinite(progress) || progress <= 0) return -1
   return EMBLEM_STAGES.indexOf(stageForProgress(progress))
+}
+
+/* ── Que se sienta el revelado (dueña 6 oct 2026) ─────────────────────
+ * La lógica del emblema NO cambia: esto solo la hace legible. Qué hábitos
+ * sumaron un día (la causa), cuánto falta para la siguiente etapa en días
+ * como los tuyos (la anticipación) y si apareció un trozo nuevo del arte.
+ */
+
+export type EvidenceKey = 'deficit' | 'trained' | 'protein' | 'sleep' | 'water'
+
+/** Los hábitos que revelan el emblema, en orden de peso (espejo de
+ *  fn_transform_points). */
+export const EVIDENCE_ORDER: readonly EvidenceKey[] = [
+  'deficit',
+  'trained',
+  'protein',
+  'sleep',
+  'water',
+]
+
+export const EVIDENCE_LABEL: Record<EvidenceKey, string> = {
+  deficit: 'déficit',
+  trained: 'entreno',
+  protein: 'proteína',
+  sleep: 'sueño de 7 h',
+  water: 'agua',
+}
+
+const EVIDENCE_POINTS: Record<EvidenceKey, number> = {
+  deficit: TRANSFORM_WEIGHTS.deficit,
+  trained: TRANSFORM_WEIGHTS.trained,
+  protein: TRANSFORM_WEIGHTS.proteinTarget,
+  sleep: TRANSFORM_WEIGHTS.sleep7h,
+  water: TRANSFORM_WEIGHTS.waterComplete,
+}
+
+export type EvidenceDay = {
+  calories?: number | null
+  protein_g?: number | null
+  trained?: boolean | null
+  sleep_minutes?: number | null
+  water_glasses?: number | null
+}
+
+export type EvidenceTargets = {
+  calorieTarget: number | null
+  proteinTarget: number | null
+  waterGoalGlasses: number
+}
+
+/** Qué hábitos cuentan ese día — la MISMA vara que fn_transform_points. */
+export function dayEvidence(
+  day: EvidenceDay | null | undefined,
+  t: EvidenceTargets,
+): EvidenceKey[] {
+  if (!day) return []
+  const out: EvidenceKey[] = []
+  const cal = day.calories ?? 0
+  if (t.calorieTarget != null && cal > 0 && cal <= t.calorieTarget && cal >= 0.6 * t.calorieTarget)
+    out.push('deficit')
+  if (day.trained === true) out.push('trained')
+  if (t.proteinTarget != null && (day.protein_g ?? 0) >= t.proteinTarget) out.push('protein')
+  if ((day.sleep_minutes ?? 0) >= 420) out.push('sleep')
+  if ((day.water_glasses ?? 0) >= Math.max(1, t.waterGoalGlasses)) out.push('water')
+  return out
+}
+
+export function evidencePoints(keys: readonly EvidenceKey[]): number {
+  return keys.reduce((a, k) => a + EVIDENCE_POINTS[k], 0)
+}
+
+/** "déficit y proteína" / "entreno, proteína y agua". */
+export function evidencePhrase(keys: readonly EvidenceKey[]): string {
+  const words = EVIDENCE_ORDER.filter((k) => keys.includes(k)).map((k) => EVIDENCE_LABEL[k])
+  if (words.length <= 1) return words[0] ?? ''
+  return `${words.slice(0, -1).join(', ')} y ${words[words.length - 1]}`
+}
+
+export type StageForecast = {
+  /** La siguiente etapa (null si ya está completo). */
+  next: EmblemStage | null
+  /** Días "como los tuyos" que faltan; null sin ritmo reciente (no se inventa). */
+  days: number | null
+}
+
+/**
+ * Cuánto falta para la siguiente etapa, en días como los tuyos: los puntos
+ * que faltan entre tu promedio de la última semana (días ya cerrados). Sin
+ * promedio (semana sin hábitos), `days` es null: solo se nombra la etapa.
+ */
+export function nextStageForecast(progress: number, pointsPerDay: number): StageForecast {
+  const next = EMBLEM_STAGES.find((s) => s.minPct > progress) ?? null
+  if (!next) return { next: null, days: null }
+  const pointsToGo = ((next.minPct - progress) / 100) * TRANSFORM_TOTAL_POINTS
+  if (!(pointsPerDay > 0)) return { next, days: null }
+  return { next, days: Math.max(1, Math.ceil(pointsToGo / pointsPerDay)) }
+}
+
+/** Promedio de puntos por día de los días dados (la semana reciente). */
+export function averagePointsPerDay(days: readonly EvidenceDay[], t: EvidenceTargets): number {
+  if (days.length === 0) return 0
+  const total = days.reduce((a, d) => a + evidencePoints(dayEvidence(d, t)), 0)
+  return total / days.length
 }

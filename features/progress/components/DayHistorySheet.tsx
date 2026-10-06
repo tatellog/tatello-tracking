@@ -30,6 +30,7 @@ import { userTimezone } from '@/lib/time'
 import { colors, spacing, typography } from '@/theme'
 
 import { foodSummary, sleepLong } from '../constancia-logic'
+import { SHEET_GRABBER, SHEET_SCRIM, SHEET_SURFACE } from '@/components/ui/StelarModal'
 
 type Props = {
   visible: boolean
@@ -85,7 +86,10 @@ export function DayHistorySheet({
 
   return (
     <Modal transparent visible={visible} animationType="none" onRequestClose={onClose}>
-      <Animated.View entering={FadeIn.duration(160)} style={styles.backdrop} pointerEvents="none" />
+      <Animated.View entering={FadeIn.duration(160)} style={styles.backdrop}>
+        {/* Tocar afuera cierra, como en las demás hojas. */}
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Cerrar" />
+      </Animated.View>
 
       <View style={styles.anchor} pointerEvents="box-none">
         <Animated.View
@@ -368,27 +372,18 @@ function sleepParts(minutes: number): { value: string; unit: string } {
 const styles = StyleSheet.create({
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(10, 6, 8, 0.6)',
+    backgroundColor: SHEET_SCRIM,
   },
   anchor: { flex: 1, justifyContent: 'flex-end' },
   sheet: {
     maxHeight: '88%',
-    backgroundColor: colors.bg,
-    borderTopLeftRadius: 26,
-    borderTopRightRadius: 26,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderBottomWidth: 0,
-    borderColor: colors.hairlineStrong,
     paddingHorizontal: spacing.md,
     paddingTop: spacing.sm,
+    ...SHEET_SURFACE,
   },
   grabber: {
-    alignSelf: 'center',
-    width: 40,
-    height: 5,
-    borderRadius: 3,
-    backgroundColor: colors.hairlineStrong,
     marginBottom: spacing.sm,
+    ...SHEET_GRABBER,
   },
   close: { position: 'absolute', top: spacing.md, right: spacing.md, zIndex: 2 },
   body: { gap: 12, paddingBottom: spacing.sm },
