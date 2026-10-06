@@ -1,5 +1,6 @@
 export { AppTabBar } from './AppTabBar'
 export { CelebrationOverlay } from './CelebrationOverlay'
+export { StardustOverlay } from './StardustOverlay'
 export { CoachLine } from './CoachLine'
 export {
   DayCheckIn,

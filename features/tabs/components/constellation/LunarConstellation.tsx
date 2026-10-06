@@ -123,6 +123,7 @@ export function LunarConstellation({
   transformProgressOverride,
   showStarLabels = false,
   reaction = null,
+  innerGlow = 0,
   onHeartLayout,
 }: Props) {
   const zodiac = ZODIAC[sign]
@@ -403,6 +404,7 @@ export function LunarConstellation({
               reduce={reduceMotion}
               // Hero vivo (V-13): solo en pantalla y sin reduce-motion.
               reaction={focused && !reduceMotion ? reaction : null}
+              innerGlow={innerGlow}
             />
           </Animated.View>
         ) : null}

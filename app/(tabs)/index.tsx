@@ -4,7 +4,7 @@ import * as Haptics from 'expo-haptics'
 import { useQueryClient } from '@tanstack/react-query'
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native'
+import { Dimensions, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native'
 import Animated, {
   FadeIn,
   FadeInDown,
@@ -17,6 +17,8 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { LoadingView } from '@/components/LoadingView'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { emitCelebrate } from '@/features/tabs/celebrate-bus'
+import { emitStardust } from '@/features/tabs/stardust-bus'
+import { discoveryProgress, innerGlowLevel } from '@/features/tabs/stardust-logic'
 import {
   consumeWatchCelebration,
   subscribeWatchCelebration,
@@ -698,6 +700,59 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
     return tail ? { ...base, after: `${base.after.replace(/\s*$/, '')} ${tail}` } : base
   })()
 
+  // Polvo de estrellas (dueña 5 oct 2026): cada comida registrada manda
+  // estrellas finas de la tarjeta de comidas al emblema, que flotan adentro y
+  // el centro se las chupa. El emblema guarda un brillo interno rumbo al
+  // siguiente hallazgo de Descubre (etapas por días con datos, sin números).
+  const discoverySignals = useSignalsHistory(90)
+  const discovery = discoverySignals.data ? discoveryProgress(discoverySignals.data) : null
+  const stardustUid = useSession().session?.user?.id ?? 'anon'
+  const mealCardRef = useRef<View>(null)
+  const lastStardustSeed = useRef<number | null>(null)
+  const fireStardust = () => {
+    const emblem = constellationRef.current
+    if (!emblem) return
+    emblem.measureInWindow((x, y, w) => {
+      if (!w) return
+      const side = heartRef.current?.canvas ?? w
+      const cx = x + (w - side) / 2 + side / 2
+      const cy = y + side * RING_CY
+      const r = side * RING_R
+      const launch = (ox: number, oy: number) => {
+        void (async () => {
+          // ¿Esta comida cruzó una etapa de Descubre? Se compara con la última
+          // etapa ya anunciada (la primera vez solo se guarda, sin anunciar).
+          const key = `stelar.stardust.stage:${stardustUid}`
+          const stage = discovery?.stage ?? null
+          let discovered = false
+          if (stage != null) {
+            const prev = await AsyncStorage.getItem(key).catch(() => null)
+            if (prev != null && stage > Number(prev)) discovered = true
+            if (prev == null || stage > Number(prev)) {
+              await AsyncStorage.setItem(key, String(stage)).catch(() => {})
+            }
+          }
+          emitStardust({ ox, oy, cx, cy, r, discovered })
+        })()
+      }
+      const card = mealCardRef.current
+      const screenH = Dimensions.get('window').height
+      if (!card) return launch(cx, screenH - 80)
+      card.measureInWindow((mx, my, mw) => {
+        // La tarjeta puede estar abajo del pliegue: entonces nacen del borde.
+        const oy = Math.min(my + 40, screenH - 80)
+        launch(mw ? mx + mw * 0.35 : cx, oy)
+      })
+    })
+  }
+  useEffect(() => {
+    if (!heroReaction || heroReaction.kind !== 'comida') return
+    if (lastStardustSeed.current === heroReaction.seed) return
+    lastStardustSeed.current = heroReaction.seed
+    fireStardust()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [heroReaction])
+
   // Tipo de entreno de HOY (para la fila colapsada y el chip activo). Solo
   // consulta cuando hoy ya está entrenado; en modo "ver día" viene del brief.
   const workoutTypeQ = useWorkoutTypeToday(!viewingPast && dayState === 'trained')
@@ -943,7 +998,10 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
                       committed={todayHasRegistro}
                       suppressBurst
                       pausedSV={constellationPaused}
-                      reaction={heroReaction}
+                      // La comida ya no hace el destello: la celebra el polvo
+                      // de estrellas (overlay global). Agua/sueño lo conservan.
+                      reaction={heroReaction?.kind === 'comida' ? null : heroReaction}
+                      innerGlow={discovery ? innerGlowLevel(discovery.fill) : 0}
                       onHeartLayout={(p) => {
                         heartRef.current = p
                       }}
@@ -996,7 +1054,7 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
             >
               <SectionHeader label={viewingPast ? 'Comidas del día' : 'Comidas'} />
             </Animated.View>
-            <Animated.View entering={enter(560)}>
+            <Animated.View entering={enter(560)} ref={mealCardRef} collapsable={false}>
               <TodayMealLog
                 date={vctx.date}
                 onOpenMeal={(id) => router.push({ pathname: '/scan-meal', params: { editId: id } })}
