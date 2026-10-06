@@ -29,10 +29,12 @@ import { emitMealLogged } from '@/features/macros/meal-logged-bus'
 import { mealMomentByHour } from '@/features/macros/meal-moment'
 import { subscribeRegistroIntent, type MealMoment } from '@/features/macros/registro-intent'
 import { useActiveLogDate } from '@/features/tabs/active-log-date'
+import { useRepeatYesterday } from '@/features/tabs/repeat-yesterday'
 import { emitMealUndo } from '@/features/tabs/undo-meal-bus'
 import { useScreenActive } from '@/features/orbit/useScreenActive'
 import { showActionSheet } from '@/lib/actionSheet'
 import { resizeForDisplay } from '@/lib/image'
+import { todayInTimezone } from '@/lib/time'
 import { colors, typography } from '@/theme'
 
 import { AllyCard } from './AllyCard'
@@ -370,6 +372,24 @@ export function MealComposer() {
     setForcedType(null)
   }
 
+  // "Repetir tu día de ayer" — con el día vacío, arriba de las frecuentes
+  // (dueña 6 oct 2026). Misma lógica que Registrar (repeat-yesterday.ts).
+  const REPEAT_DAY_KEY = '__repeat_day__'
+  const { summary: repeatDay, repeat: repeatYesterday } = useRepeatYesterday({
+    logDate: activeLogDate ?? todayInTimezone(),
+    enabled: true,
+    consumedAt: consumedAtNow,
+    dayLabel: activeLogDate && activeLogDate !== todayInTimezone() ? 'ese día' : 'hoy',
+    fallbackType: currentMealType(),
+  })
+  const handleRepeatDay = () => {
+    if (!repeatDay || confirmed) return
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
+    repeatYesterday(emitMealLogged)
+    setConfirmed(REPEAT_DAY_KEY)
+    setTimeout(() => setConfirmed((c) => (c === REPEAT_DAY_KEY ? null : c)), CONFIRM_MS)
+  }
+
   const handleRepeat = (item: FrequentMeal) => {
     if (confirmed) return
     log({
@@ -632,6 +652,25 @@ export function MealComposer() {
         </View>
       ) : null}
 
+      {repeatDay ? (
+        <Pressable
+          onPress={handleRepeatDay}
+          style={[styles.comoAyer, styles.repeatDay]}
+          accessibilityRole="button"
+          accessibilityLabel={`Repetir tu día de ayer: ${repeatDay.count} comidas`}
+        >
+          <View style={styles.comoAyerText}>
+            <Text style={styles.comoAyerLabel}>
+              {confirmed === REPEAT_DAY_KEY ? 'Registrado' : 'Repetir tu día de ayer'}
+            </Text>
+            <Text style={styles.comoAyerName} numberOfLines={1}>
+              {repeatDay.count} comidas · {repeatDay.protein} g prot · {repeatDay.kcal} kcal
+            </Text>
+          </View>
+          <Text style={styles.comoAyerChevron}>›</Text>
+        </Pressable>
+      ) : null}
+
       {/* ── §3 · Tus comidas frecuentes (dirección de arte sep 2026: nombre
           claro, sin frase de coach, eyebrow en niebla) ── */}
       <View style={styles.aliadosHead}>
@@ -719,6 +758,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     marginBottom: 12,
   },
+  repeatDay: { marginTop: 24, marginBottom: 0 },
   comoAyerText: {
     flex: 1,
     gap: 2,
