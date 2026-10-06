@@ -55,6 +55,7 @@ import { useDaySignals, useTodaySignals } from '@/features/orbit/hooks'
 import { useActiveLogDate } from '@/features/tabs/active-log-date'
 import { WatchGlyph } from '@/features/wearables/components/WatchGlyph'
 import { wearableDayFacts } from '@/features/wearables/recovery'
+import { useRepeatYesterday } from '@/features/tabs/repeat-yesterday'
 import { emitMealUndo } from '@/features/tabs/undo-meal-bus'
 import { todayInTimezone } from '@/lib/time'
 import { colors, typography } from '@/theme'
@@ -514,50 +515,20 @@ export function QuickLogSheet({ visible, onClose }: Props) {
     setTimeout(onClose, CONFIRM_HOLD_MS)
   }
 
-  // "Repetir mi día de ayer" — para quien come casi igual entre semana: todo
-  // lo de ayer en un tap, cada comida en su momento, con deshacer de todas.
-  // Solo se ofrece si el día que se registra aún está vacío (sin duplicar).
-  const dayMeals = useMealsForDate(visible ? logDate : null)
-  const yesterAll = yesterMeals.data ?? []
-  const repeatDay =
-    yesterAll.length >= 2 && dayMeals.data != null && dayMeals.data.length === 0
-      ? {
-          count: yesterAll.length,
-          kcal: Math.round(yesterAll.reduce((a, m) => a + m.calories, 0)),
-          protein: Math.round(yesterAll.reduce((a, m) => a + m.protein_g, 0)),
-        }
-      : null
+  // "Repetir tu día de ayer": todo lo de ayer en un tap (repeat-yesterday.ts).
+  const { summary: repeatDay, repeat: repeatYesterday } = useRepeatYesterday({
+    logDate,
+    enabled: visible,
+    consumedAt: logConsumedAt,
+    dayLabel: isTodayLog ? 'hoy' : backfillLabel,
+    fallbackType: mealType,
+  })
   const REPEAT_DAY_KEY = '__repeat_day__'
 
   const handleRepeatDay = () => {
     if (!repeatDay || confirmingName) return
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
-    const at = logConsumedAt()
-    Promise.all(
-      yesterAll.map((m) =>
-        createMeal.mutateAsync({
-          name: m.name,
-          protein_g: m.protein_g,
-          calories: m.calories,
-          consumed_at: at,
-          // Cada comida en su momento de ayer (si viniera uno raro, el elegido).
-          meal_type: MEAL_TYPES.some((t) => t.value === m.meal_type)
-            ? (m.meal_type as MealType)
-            : mealType,
-          photo_storage_path: m.photo_storage_path,
-          ingredients: mealIngredients(m) ?? undefined,
-        }),
-      ),
-    )
-      .then((created) => {
-        emitMealUndo({
-          id: created[0]!.id,
-          ids: created.map((c) => c.id),
-          name: `${created.length} comidas de ayer`,
-          mealTypeLabel: isTodayLog ? 'hoy' : backfillLabel,
-        })
-      })
-      .catch(() => {})
+    repeatYesterday()
     setConfirmingName(REPEAT_DAY_KEY)
     fireBurst(SCREEN_W / 2, SCREEN_H * 0.62, colors.magentaHot)
     setTimeout(onClose, CONFIRM_HOLD_MS)
