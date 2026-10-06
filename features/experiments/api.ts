@@ -8,7 +8,7 @@
  */
 import { z } from 'zod'
 
-import { supabase } from '@/lib/supabase'
+import { requireUserId, supabase } from '@/lib/supabase'
 
 type Period = 'day' | 'week' | 'month' | 'last30'
 
@@ -101,4 +101,46 @@ export async function fetchHypotheses(
     const parsed = HypothesisRowSchema.safeParse(row)
     return parsed.success ? [parsed.data] : []
   })
+}
+
+/* ── Plan de un día · "¿lo cumpliste?" ────────────────────────────────────
+ * Se guarda en `month_reflections` (misma tabla RLS de la metacognición y los
+ * focos, sin migración) con la clave `plan:<experimentId>:<YYYY-MM-DD>`. Es lo
+ * que ELLA dice; el resultado medible lo decide el motor con sus datos.
+ */
+export const PLAN_CHECKIN_PREFIX = 'plan:'
+export const PlanCheckinAnswerSchema = z.enum(['si', 'parte', 'no'])
+export type PlanCheckinAnswer = z.infer<typeof PlanCheckinAnswerSchema>
+
+export async function savePlanCheckin(
+  planId: string,
+  date: string,
+  answer: PlanCheckinAnswer,
+): Promise<void> {
+  const userId = await requireUserId()
+  const { error } = await supabase.from('month_reflections').upsert(
+    {
+      user_id: userId,
+      month: date.slice(0, 7),
+      question_key: `${PLAN_CHECKIN_PREFIX}${planId}:${date}`,
+      answer,
+    },
+    { onConflict: 'user_id,month,question_key' },
+  )
+  if (error) throw error
+}
+
+/** Fecha → respuesta de las ocurrencias ya respondidas. Nunca lanza. */
+export async function fetchPlanCheckins(planId: string): Promise<Map<string, PlanCheckinAnswer>> {
+  const { data, error } = await supabase
+    .from('month_reflections')
+    .select('question_key, answer')
+    .like('question_key', `${PLAN_CHECKIN_PREFIX}${planId}:%`)
+  const out = new Map<string, PlanCheckinAnswer>()
+  if (error || !data) return out
+  for (const r of data) {
+    const parsed = PlanCheckinAnswerSchema.safeParse(r.answer)
+    if (parsed.success) out.set(r.question_key.slice(-10), parsed.data)
+  }
+  return out
 }

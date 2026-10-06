@@ -30,6 +30,9 @@ import {
   buildExperimentScaffold,
   computeMetricRate,
   measureExperiment,
+  onlyWeekday,
+  PLAN_TEXT_MAX,
+  WEEKDAY_BASELINE_DAYS,
 } from '../_shared/intelligence/experiments.ts'
 
 const corsHeaders: Record<string, string> = {
@@ -51,6 +54,10 @@ const RequestSchema = z.union([
     action: z.literal('start'),
     hypothesisId: z.string().uuid(),
     today: z.string().regex(DAY),
+    // Plan de un día de la semana (opcional): "si es viernes, haré X".
+    weekday: z.number().int().min(0).max(6).optional(),
+    planText: z.string().trim().min(1).max(PLAN_TEXT_MAX).optional(),
+    reminderMinutes: z.number().int().min(0).max(1439).optional(),
   }),
   z.object({
     action: z.literal('close'),
@@ -116,7 +123,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
 })
 
 async function start(supabase, userId: string, body, ctx) {
-  const { hypothesisId, today } = body
+  const { hypothesisId, today, weekday, planText, reminderMinutes } = body
 
   // Auto-cerrar un experimento VENCIDO antes de arrancar otro: sin cron, un
   // activo que ya pasó su ends_on bloquearía el único slot para siempre (#13).
@@ -164,7 +171,7 @@ async function start(supabase, userId: string, body, ctx) {
   // El Finding fuente (misma ventana) → la dimensión.
   const { data: finding } = await supabase
     .from('findings')
-    .select('finding_id, category')
+    .select('finding_id, category, payload')
     .eq('finding_id', sourceFindingSlug)
     .eq('period_type', hyp.period_type)
     .eq('period_start', hyp.period_start)
@@ -172,20 +179,33 @@ async function start(supabase, userId: string, body, ctx) {
     .maybeSingle()
   if (!finding) return json({ error: 'Esta hipótesis aún no puede volverse experimento.' }, 422)
 
+  // Un plan de día solo vale sobre un hallazgo de ESE día (el motor lo guardó
+  // estructurado en el payload): nadie arma "mis viernes" sobre los martes.
+  if (weekday != null && finding.payload?.weekday !== weekday)
+    return json({ error: 'Este hallazgo no es de ese día.' }, 422)
+
   const plan = buildExperimentScaffold(
     { id: hypothesisId, sourceFindingId: hyp.source_finding_id ?? undefined },
     { id: finding.finding_id, category: finding.category },
+    weekday != null ? { weekday, planText, reminderMinutes } : {},
   )
   if (!plan) return json({ error: 'Esta dimensión no da un experimento medible.' }, 422)
 
-  // Línea base: la tasa de esa métrica en los 30 días PREVIOS a hoy.
+  // Línea base: la tasa de esa métrica en los 30 días PREVIOS a hoy; en un
+  // plan de día, ESE día en las 8 semanas previas (mismos días en ambos lados).
+  const baseDays = plan.weekday != null ? WEEKDAY_BASELINE_DAYS : 30
   const { data: priorRows } = await supabase
     .from('daily_signals')
     .select('*')
-    .gte('day', addDays(today, -30))
+    .gte('day', addDays(today, -baseDays))
     .lt('day', today)
     .order('day', { ascending: true })
-  const baseline = computeMetricRate(plan.metric, dedupeByDay(priorRows), ctx)
+  const prior = dedupeByDay(priorRows)
+  const baseline = computeMetricRate(
+    plan.metric,
+    plan.weekday != null ? onlyWeekday(prior, plan.weekday) : prior,
+    ctx,
+  )
 
   const endsOn = addDays(today, plan.durationDays)
   const { data: created, error: insErr } = await supabase
@@ -291,7 +311,12 @@ async function measureAndClose(supabase, exp, today: string, ctx) {
     .order('day', { ascending: true })
 
   const measurement = measureExperiment(
-    { metric: plan.metric, direction: plan.direction, durationDays: plan.durationDays },
+    {
+      metric: plan.metric,
+      direction: plan.direction,
+      durationDays: plan.durationDays,
+      weekday: plan.weekday,
+    },
     dedupeByDay(windowRows),
     {
       baselineRate: plan.baselineRate ?? 0,

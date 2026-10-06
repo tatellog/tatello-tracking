@@ -374,6 +374,7 @@ function detectWeekdayDietBreak(
     emerging: occ < 4,
     // La palanca más específica: el día donde se te rompe → "cuida los viernes".
     lever: occ < 4 ? undefined : `cuida los ${wd}`,
+    weekday: worst,
     title: `Los ${wd} no llegaste a déficit ${broke} de ${occ} veces.`,
     subject: `los ${wd}`,
     phrase: {

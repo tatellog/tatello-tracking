@@ -105,6 +105,9 @@ export const CYCLE_ID = 'stelar-cycle-seal'
 /** El slot N8 · la Lectura Semanal lista — el tap aterriza directo en
  *  /weekly-reading (no en un tab). */
 export const READING_ID = 'stelar-weekly-reading'
+/** El plan de un día ("Hoy es viernes · Tu plan: …"): el plan que ELLA eligió,
+ *  a la hora que eligió. Manda sobre los demás anuncios ese día. */
+export const PLAN_ID = 'stelar-weekday-plan'
 
 /** La fecha de disparo de un slot agendado (si existe): viaja en
  *  `data.fireAt` porque el trigger nativo no se puede leer de forma
@@ -235,6 +238,9 @@ export async function syncWeekSealInvite(
     // hallazgo (N9) > sello/cierre/lectura: un solo anuncio ese día.
     const findingFireAt = await scheduledFireAt(Notifications, FINDING_ID)
     if (findingFireAt && sameLocalDay(findingFireAt, sealDate)) return
+    // plan del día > todo: ese día solo suena el plan que ella eligió.
+    const planFireAt = await scheduledFireAt(Notifications, PLAN_ID)
+    if (planFireAt && sameLocalDay(planFireAt, sealDate)) return
     const cycleFireAt = await scheduledFireAt(Notifications, CYCLE_ID)
     if (cycleFireAt && sameLocalDay(cycleFireAt, sealDate)) return
     // lectura > sello: si N8 ya anuncia la lectura ese lunes, el sello cede
@@ -305,6 +311,9 @@ export async function syncDayCloseInvite(
     // hallazgo (N9) > sello/cierre/lectura: un solo anuncio ese día.
     const findingFireAt = await scheduledFireAt(Notifications, FINDING_ID)
     if (findingFireAt && sameLocalDay(findingFireAt, date)) return
+    // plan del día > todo: ese día solo suena el plan que ella eligió.
+    const planFireAt = await scheduledFireAt(Notifications, PLAN_ID)
+    if (planFireAt && sameLocalDay(planFireAt, date)) return
 
     const perm = await Notifications.getPermissionsAsync()
     if (perm.status !== 'granted') return
@@ -439,6 +448,9 @@ export async function syncOrbitPatternInvite(
     // hallazgo (N9) > señal-órbita: el hallazgo dice QUÉ encontró; esta cede.
     const findingFireAt = await scheduledFireAt(Notifications, FINDING_ID)
     if (findingFireAt && sameLocalDay(findingFireAt, date)) return
+    // plan del día > todo: ese día solo suena el plan que ella eligió.
+    const planFireAt = await scheduledFireAt(Notifications, PLAN_ID)
+    if (planFireAt && sameLocalDay(planFireAt, date)) return
     // señal-órbita > invitación: mismo minuto de mañana — la invitación cede.
     await Notifications.cancelScheduledNotificationAsync(INVITE_ID).catch(() => {})
     // señal-órbita > sello/lectura: si mañana es lunes, ambos ceden (se
@@ -670,6 +682,9 @@ export async function syncWeeklyReadingInvite(
     // hallazgo (N9) > sello/cierre/lectura: un solo anuncio ese día.
     const findingFireAt = await scheduledFireAt(Notifications, FINDING_ID)
     if (findingFireAt && sameLocalDay(findingFireAt, date)) return
+    // plan del día > todo: ese día solo suena el plan que ella eligió.
+    const planFireAt = await scheduledFireAt(Notifications, PLAN_ID)
+    if (planFireAt && sameLocalDay(planFireAt, date)) return
     // lectura > sello: mismo lunes, el sello genérico cede al contenido.
     await Notifications.cancelScheduledNotificationAsync(SEAL_ID).catch(() => {})
 
@@ -696,3 +711,44 @@ export async function syncWeeklyReadingInvite(
     // Nunca romper la app por una notificación.
   }
 }
+
+/**
+ * El recordatorio del plan de un día (dueña 6 oct 2026: "sí, a la hora que
+ * ella elija"). Agenda SOLO la próxima ocurrencia; cada apertura de la app
+ * re-sincroniza (identifier fijo → reemplaza). Sin plan, sin hora o sin
+ * permiso: cancela y sale. No depende de la ventana de avisos: lo pidió ella.
+ */
+export async function syncPlanReminder(
+  plan: { weekday: number; text: string; fireAt: Date | null } | null,
+): Promise<void> {
+  if (isExpoGo) return
+  try {
+    const Notifications = await import('expo-notifications')
+    await Notifications.cancelScheduledNotificationAsync(PLAN_ID).catch(() => {})
+    if (!plan || !plan.fireAt) return
+
+    const perm = await Notifications.getPermissionsAsync()
+    if (perm.status !== 'granted') return
+    await ensureChannels(Notifications)
+
+    const date = plan.fireAt
+    await Notifications.scheduleNotificationAsync({
+      identifier: PLAN_ID,
+      content: {
+        title: `Hoy es ${PLAN_WEEKDAY[plan.weekday] ?? 'tu día'}`,
+        body: `Tu plan: ${plan.text}`,
+        data: { target: 'hoy' satisfies NotificationTarget, fireAt: date.toISOString() },
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date,
+        channelId: CHANNEL_ANNOUNCEMENTS,
+      },
+    })
+    trackScheduled(PLAN_ID, 'hoy', date)
+  } catch {
+    // Nunca romper la app por una notificación.
+  }
+}
+
+const PLAN_WEEKDAY = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado']

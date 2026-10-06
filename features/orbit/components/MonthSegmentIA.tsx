@@ -12,6 +12,8 @@ import {
   useLatestExperiment,
   useStartExperiment,
 } from '@/features/experiments/hooks'
+import { WeekdayPlanSheet } from '@/features/experiments/components/WeekdayPlanSheet'
+import { WEEKDAY_PLURAL, weekdayPlanOf } from '@/features/experiments/plan'
 import { resultLine, resultTone } from '@/features/experiments/verdict'
 import { useMacroTargets } from '@/features/macros/hooks'
 import { useProfile } from '@/features/profile/hooks'
@@ -19,7 +21,7 @@ import { RevealedEmblem } from '@/features/tabs/components/constellation/Reveale
 import { signName, zodiacFromDate } from '@/features/tabs/zodiac'
 import { useSession } from '@/hooks/useSession'
 import { track } from '@/lib/analytics'
-import { USE_PERSISTED_MONTH_REPORT } from '@/lib/featureFlags'
+import { USE_PERSISTED_MONTH_REPORT, weekdayPlanEnabledForEmail } from '@/lib/featureFlags'
 import { queryKeys } from '@/lib/queryKeys'
 import { todayInTimezone } from '@/lib/time'
 import { colors, typography } from '@/theme'
@@ -289,6 +291,40 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
   // Profundizar: tocar el CTA abre la conversación guiada sobre el hallazgo. El
   // chat es la experiencia principal (el motor detecta, la IA comunica).
   const [openFinding, setOpenFinding] = useState<Finding | null>(null)
+
+  // Plan de un día (dueña 6 oct 2026): un hallazgo de UN día ("los viernes")
+  // ofrece armar un plan en vez de "probarlo". Solo en las cuentas del flag.
+  const planEnabled = weekdayPlanEnabledForEmail(session?.user?.email)
+  const [planFor, setPlanFor] = useState<{ hypothesisId: string; weekday: number } | null>(null)
+  const activePlan = weekdayPlanOf(activeExp)
+  const openHyp =
+    openFinding != null
+      ? (hypRows?.find((h) => h.source_finding_id === openFinding.id) ?? null)
+      : null
+  const planTrial = (() => {
+    if (!planEnabled || openFinding?.weekday == null || openHyp == null) return null
+    if (activePlan && activePlan.hypothesisId === openHyp.id) {
+      return {
+        state: 'planRunning' as const,
+        text: activePlan.text,
+        busy: cancelExp.isPending,
+        onLeave: () => {
+          track('weekday_plan_left', { weekday: activePlan.weekday })
+          cancelExp.mutate(activePlan.id)
+        },
+      }
+    }
+    if (openHyp.status !== 'open' || activeExp != null) return null
+    const weekday = openFinding.weekday
+    return {
+      state: 'plan' as const,
+      label: `Armar mi plan para los ${WEEKDAY_PLURAL[weekday] ?? 'días'}`,
+      onPlan: () => {
+        setOpenFinding(null)
+        setPlanFor({ hypothesisId: openHyp.id, weekday })
+      },
+    }
+  })()
   // El hash sale del reporte cuando el flip está ON (no recomputa); si no, se
   // computa local sobre los mismos hallazgos.
   const localHash = useMemo(() => hashFindings(chat.cards), [chat.cards])
@@ -436,7 +472,10 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
         onKeepFoco={(foco) => openFinding && keep.mutate({ findingId: openFinding.id, foco })}
         kept={openFinding ? focoByFinding.has(openFinding.id) : false}
         // La prueba (V-12) solo aplica al hallazgo principal (su hipótesis).
-        trial={openFinding != null && openFinding.id === mainFinding?.id ? mainTrial : null}
+        trial={
+          planTrial ??
+          (openFinding != null && openFinding.id === mainFinding?.id ? mainTrial : null)
+        }
         onNext={() => setOpenFinding(null)}
         onClose={() => setOpenFinding(null)}
         onPickDay={(date) => {
@@ -444,6 +483,15 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
           onPickDay?.(date)
         }}
       />
+      {planFor ? (
+        <WeekdayPlanSheet
+          visible
+          onClose={() => setPlanFor(null)}
+          uid={uid}
+          hypothesisId={planFor.hypothesisId}
+          weekday={planFor.weekday}
+        />
+      ) : null}
     </Animated.View>
   )
 }
