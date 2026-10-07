@@ -33,7 +33,7 @@ import { processAndUploadFromUri } from '@/features/onboarding/photos/api'
 import type { PhotoAngle } from '@/features/onboarding/photos/hooks/usePhotosToday'
 import { HealthCardHeader } from '@/features/progress/components/HealthCardHeader'
 import { CalendarGlyph, FramesGlyph } from '@/features/progress/components/HealthGlyphs'
-import { PoseGlyph } from '@/features/progress/components/PoseGlyph'
+import { AngleGlyph, Viewfinder } from '@/features/progress/components/AngleGlyph'
 import { SkyBackground } from '@/features/tabs/components'
 import { showActionSheet } from '@/lib/actionSheet'
 import { queryKeys } from '@/lib/queryKeys'
@@ -294,9 +294,25 @@ export default function LogPhotosScreen() {
                         </Animated.View>
                       ) : (
                         <View style={styles.emptyBody}>
-                          <PoseGlyph pose={a.key} size={40} color={colors.bone} />
+                          <Viewfinder color={colors.hairlineStrong} />
+                          <AngleGlyph angle={a.key} color={colors.bone} accent={colors.magenta} />
                           <Text style={styles.emptyLabel}>{a.label}</Text>
-                          <Text style={styles.emptyAdd}>Agregar</Text>
+                          <View style={styles.addRow}>
+                            <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+                              <Path
+                                d="M4 8.5A2.5 2.5 0 0 1 6.5 6h1.6l1.4-2h5l1.4 2h1.6A2.5 2.5 0 0 1 20 8.5v8A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5z"
+                                stroke={colors.magenta}
+                                strokeWidth={1.8}
+                                strokeLinejoin="round"
+                              />
+                              <Path
+                                d="M12 15.5a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"
+                                stroke={colors.magenta}
+                                strokeWidth={1.8}
+                              />
+                            </Svg>
+                            <Text style={styles.emptyAdd}>Agregar</Text>
+                          </View>
                         </View>
                       )}
 
@@ -381,6 +397,7 @@ const styles = StyleSheet.create({
   tip: { fontFamily: typography.uiMedium, fontSize: typography.sizes.label, color: colors.niebla },
   barTrack: { height: 4, borderRadius: 2, backgroundColor: colors.hairline, overflow: 'hidden' },
   barFill: { height: '100%', borderRadius: 2, backgroundColor: colors.magenta },
+  addRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   emptyAdd: {
     fontFamily: typography.uiBold,
     fontSize: typography.sizes.label,
@@ -423,8 +440,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: -8,
-    gap: 10,
+    gap: 8,
   },
   emptyLabel: {
     fontFamily: typography.uiSemi,
