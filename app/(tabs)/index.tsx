@@ -755,7 +755,24 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
   const planEnabled = weekdayPlanEnabledForEmail(planSession?.user?.email)
   const mealCardRef = useRef<View>(null)
   const lastStardustSeed = useRef<number | null>(null)
+  // Si el emblema no está a la vista (registraste con Hoy scrolleado hacia
+  // las comidas), la página SUBE primero al emblema y luego sale el polvo de
+  // estrellas, para verlo entrar (dueña 7 oct 2026).
   const fireStardust = () => {
+    const emblem = constellationRef.current
+    if (!emblem) return
+    emblem.measureInWindow((_x, y, w, h) => {
+      if (!w) return
+      const screenH = Dimensions.get('window').height
+      const topSafe = 90
+      const visible = y >= topSafe - 20 && y + h <= screenH - 110
+      if (visible) return fireStardustNow()
+      const target = Math.max(0, scrollY.value + y - topSafe)
+      scrollRef.current?.scrollTo({ y: target, animated: true })
+      setTimeout(fireStardustNow, 480)
+    })
+  }
+  const fireStardustNow = () => {
     const emblem = constellationRef.current
     if (!emblem) return
     emblem.measureInWindow((x, y, w) => {
