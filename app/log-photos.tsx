@@ -1,7 +1,7 @@
 import * as Haptics from 'expo-haptics'
 import * as ImagePicker from 'expo-image-picker'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Alert,
   Image,
@@ -13,7 +13,14 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native'
-import Animated, { FadeIn } from 'react-native-reanimated'
+import Animated, {
+  FadeIn,
+  ZoomIn,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Path } from 'react-native-svg'
 import Toast from 'react-native-toast-message'
@@ -24,8 +31,11 @@ import { StarLoader } from '@/components/StarLoader'
 import { DateField } from '@/features/onboarding/components/DateField'
 import { processAndUploadFromUri } from '@/features/onboarding/photos/api'
 import type { PhotoAngle } from '@/features/onboarding/photos/hooks/usePhotosToday'
-import { PoseGlyph } from '@/features/progress/components/PoseGlyph'
+import { HealthCardHeader } from '@/features/progress/components/HealthCardHeader'
+import { CalendarGlyph, FramesGlyph } from '@/features/progress/components/HealthGlyphs'
+import { AngleGlyph, Viewfinder } from '@/features/progress/components/AngleGlyph'
 import { SkyBackground } from '@/features/tabs/components'
+import { showActionSheet } from '@/lib/actionSheet'
 import { queryKeys } from '@/lib/queryKeys'
 import { colors, typography } from '@/theme'
 
@@ -59,8 +69,11 @@ const ANGLES: { key: PhotoAngle; label: string }[] = [
 ]
 
 const GAP = 10
-// Header + hint + DateField + zona CTA (aprox.): lo que NO es grid.
-const CHROME = 250
+// Header + tarjeta de fecha + encabezado de ángulos + consejo + CTA (aprox.):
+// lo que NO es grid.
+const CHROME = 400
+// Padding interno de la tarjeta de ángulos.
+const CARD_PAD = 14
 
 const parseISODate = (v: string): Date | null => {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v)
@@ -76,9 +89,9 @@ export default function LogPhotosScreen() {
   // target/legibilidad) y techo 4:5 (que no vuelvan a ser torres).
   const { width: screenW, height: screenH } = useWindowDimensions()
   const insets = useSafeAreaInsets()
-  const slotW = Math.floor((screenW - 40 - GAP) / 2)
+  const slotW = Math.floor((screenW - 40 - CARD_PAD * 2 - GAP) / 2)
   const availH = screenH - insets.top - insets.bottom - CHROME
-  const slotH = Math.max(150, Math.min(Math.floor((availH - GAP) / 2), Math.round(slotW * 1.25)))
+  const slotH = Math.max(140, Math.min(Math.floor((availH - GAP) / 2), Math.round(slotW * 1.25)))
 
   // "Agregar fotos de esta fecha" (medición completa) manda su fecha; sin
   // param, hoy.
@@ -90,11 +103,33 @@ export default function LogPhotosScreen() {
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
   const [uploadingAngle, setUploadingAngle] = useState<PhotoAngle | null>(null)
 
-  const pick = async (angle: PhotoAngle) => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      quality: 0.9,
-    })
+  // Cámara o galería (dueña 7 oct 2026: antes solo abría la galería).
+  const pick = (angle: PhotoAngle) => {
+    showActionSheet(
+      {
+        title: 'Foto de progreso',
+        options: ['Tomar foto', 'Elegir de galería', 'Cancelar'],
+        cancelButtonIndex: 2,
+      },
+      (i) => {
+        if (i === 0) void pickFrom(angle, 'camera')
+        else if (i === 1) void pickFrom(angle, 'library')
+      },
+    )
+  }
+
+  const pickFrom = async (angle: PhotoAngle, source: 'camera' | 'library') => {
+    if (source === 'camera') {
+      const perm = await ImagePicker.requestCameraPermissionsAsync()
+      if (!perm.granted) {
+        Alert.alert('Cámara', 'Necesitamos permiso a la cámara para tomar la foto.')
+        return
+      }
+    }
+    const result =
+      source === 'camera'
+        ? await ImagePicker.launchCameraAsync({ quality: 0.9 })
+        : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.9 })
     const uri = result.assets?.[0]?.uri
     if (!result.canceled && uri) {
       Haptics.selectionAsync().catch(() => {})
@@ -122,6 +157,7 @@ export default function LogPhotosScreen() {
   }
 
   const pickedCount = Object.keys(picked).length
+  const isToday = date.toDateString() === new Date().toDateString()
 
   const save = async () => {
     const entries = Object.entries(picked) as [PhotoAngle, string][]
@@ -173,7 +209,7 @@ export default function LogPhotosScreen() {
       <SkyBackground />
       <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
         <View style={styles.header}>
-          <Text style={styles.title}>Sube tus fotos</Text>
+          <Text style={styles.title}>Fotos de progreso</Text>
           <Pressable
             onPress={() => router.back()}
             hitSlop={12}
@@ -196,97 +232,133 @@ export default function LogPhotosScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* Instrucción, no voz de coach → Hanken recta (regla tipográfica). */}
-          <Text style={styles.hint}>Sube los ángulos que tengas · de hoy o de antes.</Text>
-
-          <View style={styles.dateWrap}>
+          {/* Fecha (estilo Salud): de hoy o de antes. */}
+          <Animated.View entering={FadeIn.duration(300)} style={styles.card}>
+            <HealthCardHeader
+              icon={<CalendarGlyph color={colors.oroSoft} />}
+              title="Fecha"
+              color={colors.oroSoft}
+              right={isToday ? 'Hoy' : 'Otra fecha'}
+            />
             <DateField
-              label="Fecha de las fotos"
+              label="Tomadas el"
               value={date}
               onChange={setDate}
               defaultDate={initial}
               maxDate={new Date()}
             />
-          </View>
+          </Animated.View>
 
-          <View style={styles.grid}>
-            {ANGLES.map((a) => {
-              const uri = picked[a.key]
-              const filled = uri != null
-              const uploading = uploadingAngle === a.key && saving
-              return (
-                /* Patrón AccountRow (probado): el Pressable ENVUELVE al slot
+          <Animated.View entering={FadeIn.duration(300).delay(100)} style={styles.card}>
+            <HealthCardHeader
+              icon={<FramesGlyph color={colors.magenta} />}
+              title="Ángulos"
+              color={colors.magenta}
+              right={`${pickedCount} de ${ANGLES.length}`}
+            />
+            <AnglesBar count={pickedCount} total={ANGLES.length} />
+            <View style={styles.grid}>
+              {ANGLES.map((a) => {
+                const uri = picked[a.key]
+                const filled = uri != null
+                const uploading = uploadingAngle === a.key && saving
+                return (
+                  /* Patrón AccountRow (probado): el Pressable ENVUELVE al slot
                    dimensionado — un Pressable sin hijos con absoluteFill queda
                    en tamaño cero en este setup (quirk documentado). */
-                <Pressable
-                  key={a.key}
-                  onPress={() => (filled ? manage(a.key, a.label) : void pick(a.key))}
-                  disabled={saving}
-                  accessibilityRole="button"
-                  accessibilityLabel={
-                    filled ? `Cambiar o quitar la foto de ${a.label}` : `Elegir foto de ${a.label}`
-                  }
-                  style={({ pressed }) => pressed && { opacity: 0.75 }}
-                >
-                  <View
-                    style={[
-                      styles.slot,
-                      { width: slotW, height: slotH },
-                      filled && styles.slotFilled,
-                    ]}
+                  <Pressable
+                    key={a.key}
+                    onPress={() => (filled ? manage(a.key, a.label) : void pick(a.key))}
+                    disabled={saving}
+                    accessibilityRole="button"
+                    accessibilityLabel={
+                      filled
+                        ? `Cambiar o quitar la foto de ${a.label}`
+                        : `Elegir foto de ${a.label}`
+                    }
+                    style={({ pressed }) => pressed && { opacity: 0.75 }}
                   >
-                    {filled ? (
-                      <Animated.View
-                        entering={FadeIn.duration(200)}
-                        style={StyleSheet.absoluteFill}
-                      >
-                        <Image source={{ uri }} style={styles.thumb} resizeMode="cover" />
-                      </Animated.View>
-                    ) : (
-                      <View style={styles.emptyBody}>
-                        <PoseGlyph pose={a.key} size={44} color={colors.bone} />
-                        <Text style={styles.emptyLabel}>{a.label}</Text>
-                      </View>
-                    )}
-
-                    {/* Label chip solo sobre foto (sobre bgCard no lo necesita). */}
-                    {filled ? <Text style={styles.filledLabel}>{a.label}</Text> : null}
-
-                    {/* Badge de esquina: "+" para invitar, palomita al elegir. */}
-                    <View style={[styles.badge, filled && styles.badgeFilled]}>
+                    <View
+                      style={[
+                        styles.slot,
+                        { width: slotW, height: slotH },
+                        filled && styles.slotFilled,
+                      ]}
+                    >
                       {filled ? (
-                        <Svg width={12} height={12} viewBox="0 0 12 12" fill="none">
-                          <Path
-                            d="M2.5 6.5 L5 9 L9.5 3.5"
-                            stroke={colors.bg}
-                            strokeWidth={1.8}
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                        </Svg>
+                        <Animated.View
+                          entering={ZoomIn.springify().damping(16)}
+                          style={StyleSheet.absoluteFill}
+                        >
+                          <Image source={{ uri }} style={styles.thumb} resizeMode="cover" />
+                        </Animated.View>
                       ) : (
-                        <Text style={styles.badgePlus}>+</Text>
+                        <View style={styles.emptyBody}>
+                          <Viewfinder color={colors.hairlineStrong} />
+                          <AngleGlyph angle={a.key} color={colors.bone} accent={colors.magenta} />
+                          <Text style={styles.emptyLabel}>{a.label}</Text>
+                          <View style={styles.addRow}>
+                            <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+                              <Path
+                                d="M4 8.5A2.5 2.5 0 0 1 6.5 6h1.6l1.4-2h5l1.4 2h1.6A2.5 2.5 0 0 1 20 8.5v8A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5z"
+                                stroke={colors.magenta}
+                                strokeWidth={1.8}
+                                strokeLinejoin="round"
+                              />
+                              <Path
+                                d="M12 15.5a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"
+                                stroke={colors.magenta}
+                                strokeWidth={1.8}
+                              />
+                            </Svg>
+                            <Text style={styles.emptyAdd}>Agregar</Text>
+                          </View>
+                        </View>
                       )}
-                    </View>
 
-                    {/* Overlay de subida del slot en vuelo. */}
-                    {uploading ? (
-                      <Animated.View entering={FadeIn.duration(150)} style={styles.uploading}>
-                        <StarLoader size={20} />
-                      </Animated.View>
-                    ) : null}
-                  </View>
-                </Pressable>
-              )
-            })}
-          </View>
+                      {/* Label chip solo sobre foto (sobre bgCard no lo necesita). */}
+                      {filled ? <Text style={styles.filledLabel}>{a.label}</Text> : null}
+
+                      {/* Palomita de esquina al elegir (el "Agregar" ya invita). */}
+                      {filled ? (
+                        <View style={[styles.badge, styles.badgeFilled]}>
+                          <Animated.View entering={ZoomIn.delay(120).springify().damping(10)}>
+                            <Svg width={12} height={12} viewBox="0 0 12 12" fill="none">
+                              <Path
+                                d="M2.5 6.5 L5 9 L9.5 3.5"
+                                stroke={colors.bg}
+                                strokeWidth={1.8}
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                            </Svg>
+                          </Animated.View>
+                        </View>
+                      ) : null}
+
+                      {/* Overlay de subida del slot en vuelo. */}
+                      {uploading ? (
+                        <Animated.View entering={FadeIn.duration(150)} style={styles.uploading}>
+                          <StarLoader size={20} />
+                        </Animated.View>
+                      ) : null}
+                    </View>
+                  </Pressable>
+                )
+              })}
+            </View>
+
+            <Text style={styles.tip}>
+              Misma luz, misma distancia y misma pose: así se comparan mejor.
+            </Text>
+          </Animated.View>
 
           {/* CTA anclado abajo: el vacío es aire entre contenido y acción. */}
           <View style={styles.ctaWrap}>
             <PrimaryCta
               label={
                 pickedCount === 0
-                  ? 'Guardar fotos'
+                  ? 'Elige al menos una foto'
                   : pickedCount === 1
                     ? 'Guardar 1 foto'
                     : `Guardar ${pickedCount} fotos`
@@ -317,13 +389,22 @@ const styles = StyleSheet.create({
     paddingBottom: 4,
   },
   title: {
-    fontFamily: typography.displayHeavy,
-    fontSize: typography.sizes.headingLg,
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.displaySm,
     color: colors.leche,
-    letterSpacing: -0.5,
+  },
+  card: { borderRadius: 20, backgroundColor: colors.bgCard, padding: CARD_PAD, gap: 12 },
+  tip: { fontFamily: typography.uiMedium, fontSize: typography.sizes.label, color: colors.niebla },
+  barTrack: { height: 4, borderRadius: 2, backgroundColor: colors.hairline, overflow: 'hidden' },
+  barFill: { height: '100%', borderRadius: 2, backgroundColor: colors.magenta },
+  addRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  emptyAdd: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.label,
+    color: colors.magenta,
   },
   // flexGrow: el CTA ancla abajo (marginTop auto) y el hueco se vuelve aire.
-  content: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 32, flexGrow: 1 },
+  content: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 32, flexGrow: 1, gap: 12 },
   hint: {
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.body,
@@ -334,10 +415,10 @@ const styles = StyleSheet.create({
   dateWrap: { marginBottom: 16 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GAP },
   slot: {
-    borderRadius: 16,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.10)',
-    backgroundColor: colors.bgCard,
+    borderColor: colors.hairline,
+    backgroundColor: colors.bgCard2,
     overflow: 'hidden',
   },
   // El borde se ENCIENDE al elegir — mismo vocabulario que el hairline del
@@ -359,15 +440,12 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: -8,
-    gap: 10,
+    gap: 8,
   },
   emptyLabel: {
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.micro,
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
-    color: colors.bone,
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.body,
+    color: colors.leche,
   },
   thumb: { ...StyleSheet.absoluteFillObject },
   filledLabel: {
@@ -375,9 +453,7 @@ const styles = StyleSheet.create({
     bottom: 8,
     alignSelf: 'center',
     fontFamily: typography.uiBold,
-    fontSize: typography.sizes.micro,
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
+    fontSize: typography.sizes.label,
     color: colors.leche,
     backgroundColor: 'rgba(10, 6, 8, 0.6)',
     paddingHorizontal: 8,
@@ -415,5 +491,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  ctaWrap: { marginTop: 'auto', paddingTop: 18 },
+  ctaWrap: { marginTop: 'auto', paddingTop: 6 },
 })
+
+/** Barra de avance de los ángulos: se llena con cada foto elegida. */
+function AnglesBar({ count, total }: { count: number; total: number }) {
+  const reduce = useReducedMotion()
+  const w = useSharedValue(0)
+  useEffect(() => {
+    const target = total > 0 ? (count / total) * 100 : 0
+    w.value = reduce ? target : withTiming(target, { duration: 320 })
+  }, [count, total, reduce, w])
+  const fill = useAnimatedStyle(() => ({ width: `${w.value}%` }))
+  return (
+    <View style={styles.barTrack}>
+      <Animated.View style={[styles.barFill, fill]} />
+    </View>
+  )
+}

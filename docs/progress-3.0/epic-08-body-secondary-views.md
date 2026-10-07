@@ -1,5 +1,7 @@
 # Epic 08 · Body — Vistas secundarias
 
+> **Actualización 7 oct 2026 · refactor estilo Salud.** Esta épica quedó reducida: `/stelar-observes`, `/photo-chapter`, `/body-composition`, `/body-story` y `/progress-analysis` se borraron (duplicaban la tarjeta de Peso, "Antes y ahora" o la Síntesis, o eran frases). Quedan `/weight-trend` (rehecha como "Mostrar todos los datos" del Peso), `/metric/[key]` (detalle de cada tarjeta de composición) y `/progress-table`. El comparador A/B, las fotos y MI TRANSFORMACIÓN viven en el módulo "Antes y ahora" de Cuerpo. El resto de este documento es histórico.
+
 > Brief dueña (jul 2026): diseñar TODAS las pantallas que se abren desde los
 > CTAs del segmento Cuerpo. No modificar la pantalla principal. Navegación
 > estilo Apple Health + Oura: cada pantalla responde UNA pregunta y profundiza

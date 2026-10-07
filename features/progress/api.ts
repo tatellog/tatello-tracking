@@ -305,6 +305,8 @@ export type TimelinePhoto = {
   taken_at: string
   angle: PhotoAngle
   signed_url: string | null
+  /** Para borrarla (fila + objeto de storage). */
+  storage_path: string
 }
 
 /** TODAS las fotos de progreso (4 ángulos) con URLs firmadas EN LOTE (una
@@ -335,6 +337,7 @@ export async function getPhotoTimeline(): Promise<TimelinePhoto[]> {
     taken_at: r.taken_at as string,
     angle: r.angle,
     signed_url: signed?.[i]?.signedUrl ?? null,
+    storage_path: r.storage_path as string,
   }))
 }
 

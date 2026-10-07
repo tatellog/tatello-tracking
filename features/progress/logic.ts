@@ -10,6 +10,16 @@ export type WeightPoint = {
   t: number
   /** Peso en kg, garantizado no-null. */
   weight: number
+  /** De dónde vino (app, coach o báscula); se muestra al tocar el punto. */
+  source?: WeightSource
+}
+
+export type WeightSource = 'app' | 'coach' | 'scale'
+
+export const WEIGHT_SOURCE_LABEL: Record<WeightSource, string> = {
+  app: 'Manual',
+  coach: 'Coach',
+  scale: 'Báscula',
 }
 
 /*
@@ -191,19 +201,81 @@ export function mergeWeightSeries(
   // La báscula (spec wearables §9) va PRIMERO = menor prioridad: rellena los
   // días sin registro propio; cualquier manual del mismo día la pisa.
   for (const s of scale) {
-    byDay.set(s.day_date, { t: new Date(s.measured_at).getTime(), weight: s.weight_kg })
+    byDay.set(s.day_date, {
+      t: new Date(s.measured_at).getTime(),
+      weight: s.weight_kg,
+      source: 'scale',
+    })
   }
   for (const c of checkins) {
     if (c.weight_kg == null) continue
     const [y, m, d] = c.measured_on.split('-').map(Number) as [number, number, number]
-    byDay.set(c.measured_on, { t: new Date(y, m - 1, d, 8).getTime(), weight: c.weight_kg })
+    byDay.set(c.measured_on, {
+      t: new Date(y, m - 1, d, 8).getTime(),
+      weight: c.weight_kg,
+      source: 'coach',
+    })
   }
   for (const m of measurements) {
     if (m.weight_kg == null) continue
     const day = m.measured_at.slice(0, 10)
-    byDay.set(day, { t: new Date(m.measured_at).getTime(), weight: m.weight_kg })
+    byDay.set(day, { t: new Date(m.measured_at).getTime(), weight: m.weight_kg, source: 'app' })
   }
   return [...byDay.values()].sort((a, b) => a.t - b.t)
+}
+
+/* ─── La tarjeta de Peso (estilo Salud, dueña 7 oct 2026) ─────────────────
+ *
+ * Cada número dice desde cuándo y con cuántos datos. Con 4+ mediciones el
+ * cambio va de promedio (7 días) a promedio, para que un pesaje suelto no sea
+ * la noticia; con menos, de medición a medición, sin disfrazarlo de tendencia.
+ */
+
+/** Mediciones mínimas en el rango para hablar de tendencia. */
+export const MIN_TREND_POINTS = 4
+
+export type WeightChange = {
+  /** kg (último − primero), redondeado a 0.1. */
+  abs: number
+  fromT: number
+  toT: number
+  /** Mediciones en el rango. */
+  n: number
+  /** 'avg' = promedio 7 días a promedio; 'raw' = medición a medición. */
+  mode: 'avg' | 'raw'
+}
+
+export function describeWeightChange(raw: readonly WeightPoint[]): WeightChange | null {
+  const first = raw[0]
+  const last = raw[raw.length - 1]
+  if (!first || !last || raw.length < 2) return null
+  const mode = raw.length >= MIN_TREND_POINTS ? 'avg' : 'raw'
+  const series = mode === 'avg' ? smoothWeightPoints([...raw]) : raw
+  const a = series[0]!.weight
+  const b = series[series.length - 1]!.weight
+  return {
+    abs: Math.round((b - a) * 10) / 10,
+    fromT: first.t,
+    toT: last.t,
+    n: raw.length,
+    mode,
+  }
+}
+
+/** Cuántos pesajes faltan para que haya tendencia (0 = ya hay). */
+export function weighInsForTrend(n: number): number {
+  return Math.max(0, MIN_TREND_POINTS - n)
+}
+
+/** Tres marcas de kilos redondos que cubren los puntos (eje de la gráfica). */
+export function weightAxisTicks(points: readonly { weight: number }[]): [number, number, number] {
+  if (points.length === 0) return [0, 1, 2]
+  const ws = points.map((p) => p.weight)
+  const lo = Math.floor(Math.min(...ws) - 0.3)
+  const hi = Math.max(...ws) + 0.3
+  let step = Math.max(1, Math.ceil((hi - lo) / 2))
+  while (lo + 2 * step < hi) step += 1
+  return [lo, lo + step, lo + 2 * step]
 }
 
 /* ─── Export CSV (propiedad de datos · decisión benchmark) ───────────────
@@ -491,7 +563,7 @@ export function proteinAverageComparison(
 }
 
 /** Días entre dos YYYY-MM-DD sin parsear Date en caliente (Hermes). */
-function daysBetween(a: string, b: string): number {
+export function daysBetween(a: string, b: string): number {
   const [ay, am, ad] = a.split('-').map(Number) as [number, number, number]
   const [by, bm, bd] = b.split('-').map(Number) as [number, number, number]
   return Math.round(
@@ -571,7 +643,38 @@ export function mergeComposition(
 }
 
 /** Punto de una serie de composición: día + valor. */
-export type SeriesPoint = { day: string; value: number }
+export type SeriesPoint = {
+  day: string
+  value: number
+  /** De dónde vino: una medición (check-in) o Salud (wearable). */
+  source?: 'checkin' | 'wearable'
+}
+
+export const SERIES_SOURCE_LABEL: Record<'checkin' | 'wearable', string> = {
+  checkin: 'Medición',
+  wearable: 'Salud',
+}
+
+/**
+ * Cambio de una métrica de composición sin mezclar fuentes (dueña 7 oct 2026:
+ * restar un InBody contra una báscula de Salud no es un cambio real). Toma la
+ * fuente de la última medición y compara su primer y último punto. null con
+ * menos de 2 puntos de esa fuente.
+ */
+export function sameSourceChange(
+  points: readonly SeriesPoint[],
+): { abs: number; fromDay: string; n: number } | null {
+  const last = points[points.length - 1]
+  if (!last) return null
+  const same = points.filter((p) => p.source === last.source)
+  if (same.length < 2) return null
+  const first = same[0]!
+  return {
+    abs: Math.round((last.value - first.value) * 10) / 10,
+    fromDay: first.day,
+    n: same.length,
+  }
+}
 
 export type CompositionSeriesKey = 'body_fat_pct' | 'muscle_kg' | 'water_pct' | 'bmi' | 'lean_kg'
 
@@ -585,7 +688,7 @@ export function compositionSeries(
   checkins: readonly BodyCheckin[],
   wearable: readonly BodyComposition[],
 ): Record<CompositionSeriesKey, SeriesPoint[]> {
-  const out: Record<CompositionSeriesKey, Map<string, number>> = {
+  const out: Record<CompositionSeriesKey, Map<string, SeriesPoint>> = {
     body_fat_pct: new Map(),
     muscle_kg: new Map(),
     water_pct: new Map(),
@@ -593,21 +696,21 @@ export function compositionSeries(
     lean_kg: new Map(),
   }
   for (const w of wearable) {
-    if (w.body_fat_pct != null) out.body_fat_pct.set(w.day_date, w.body_fat_pct)
-    if (w.lean_body_mass_kg != null) out.lean_kg.set(w.day_date, w.lean_body_mass_kg)
-    if (w.bmi != null) out.bmi.set(w.day_date, w.bmi)
+    const at = (value: number): SeriesPoint => ({ day: w.day_date, value, source: 'wearable' })
+    if (w.body_fat_pct != null) out.body_fat_pct.set(w.day_date, at(w.body_fat_pct))
+    if (w.lean_body_mass_kg != null) out.lean_kg.set(w.day_date, at(w.lean_body_mass_kg))
+    if (w.bmi != null) out.bmi.set(w.day_date, at(w.bmi))
   }
   for (const c of checkins) {
     // El check-in GANA el día (medición deliberada).
-    if (c.body_fat_pct != null) out.body_fat_pct.set(c.measured_on, c.body_fat_pct)
-    if (c.muscle_kg != null) out.muscle_kg.set(c.measured_on, c.muscle_kg)
-    if (c.water_pct != null) out.water_pct.set(c.measured_on, c.water_pct)
-    if (c.bmi != null) out.bmi.set(c.measured_on, c.bmi)
+    const at = (value: number): SeriesPoint => ({ day: c.measured_on, value, source: 'checkin' })
+    if (c.body_fat_pct != null) out.body_fat_pct.set(c.measured_on, at(c.body_fat_pct))
+    if (c.muscle_kg != null) out.muscle_kg.set(c.measured_on, at(c.muscle_kg))
+    if (c.water_pct != null) out.water_pct.set(c.measured_on, at(c.water_pct))
+    if (c.bmi != null) out.bmi.set(c.measured_on, at(c.bmi))
   }
-  const toSeries = (m: Map<string, number>): SeriesPoint[] =>
-    [...m.entries()]
-      .map(([day, value]) => ({ day, value }))
-      .sort((a, b) => (a.day < b.day ? -1 : 1))
+  const toSeries = (m: Map<string, SeriesPoint>): SeriesPoint[] =>
+    [...m.values()].sort((a, b) => (a.day < b.day ? -1 : 1))
   return {
     body_fat_pct: toSeries(out.body_fat_pct),
     muscle_kg: toSeries(out.muscle_kg),
@@ -823,7 +926,7 @@ export function checkinSeries(
 ): SeriesPoint[] {
   return checkins
     .filter((c) => typeof c[key] === 'number')
-    .map((c) => ({ day: c.measured_on, value: c[key] as number }))
+    .map((c) => ({ day: c.measured_on, value: c[key] as number, source: 'checkin' as const }))
     .sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : 0))
 }
 
@@ -1046,4 +1149,288 @@ export function compareHistory(
   ]
 
   return { windowDays: win, metrics: metrics.filter((x): x is MetricComparison => x != null) }
+}
+
+/* ─── Antes y ahora (dueña 7 oct 2026) ─────────────────────────────────────
+ *
+ * Fotos, historial y comparador en un solo módulo. Cada fecha con evidencia
+ * (foto del ángulo o medición) es una entrada con sus números de ESE día. El
+ * peso sale del check-in o, si no lo trae, de la medición más cercana (±7
+ * días) de la serie fusionada, así nunca contradice a la tarjeta de Peso.
+ */
+
+export type CompareEntry = {
+  day: string
+  photo: TimelinePhoto | null
+  weight: number | null
+  fat: number | null
+  muscle: number | null
+  water: number | null
+  visceral: number | null
+  bmi: number | null
+}
+
+const NEAR_MS = 7 * 24 * 60 * 60 * 1000
+
+export function buildCompareEntries(
+  checkins: readonly BodyCheckin[],
+  photos: readonly TimelinePhoto[],
+  angle: PhotoAngle | null,
+  weights: readonly WeightPoint[],
+): CompareEntry[] {
+  const byDay = new Map(checkins.map((c) => [c.measured_on, c]))
+  const photoDays = angle ? photoDatesFor(photos, angle) : []
+  const days = [...new Set([...checkins.map((c) => c.measured_on), ...photoDays])].sort()
+  const nearestWeight = (day: string): number | null => {
+    const [y, m, d] = day.split('-').map(Number) as [number, number, number]
+    const t = new Date(y, m - 1, d, 12).getTime()
+    let best: WeightPoint | null = null
+    for (const p of weights) {
+      if (Math.abs(p.t - t) > NEAR_MS) continue
+      if (!best || Math.abs(p.t - t) < Math.abs(best.t - t)) best = p
+    }
+    return best?.weight ?? null
+  }
+  return days
+    .map((day) => {
+      const c = byDay.get(day) ?? null
+      const photo = angle ? photoAt(photos, angle, day) : null
+      return {
+        day,
+        photo: photo?.signed_url ? photo : null,
+        weight: c?.weight_kg ?? nearestWeight(day),
+        fat: c?.body_fat_pct ?? null,
+        muscle: c?.muscle_kg ?? null,
+        water: c?.water_pct ?? null,
+        visceral: c?.visceral_fat_index ?? null,
+        bmi: c?.bmi ?? null,
+      }
+    })
+    .filter((e) => e.photo != null || e.weight != null || e.fat != null)
+}
+
+export type CompareDelta = {
+  key: 'weight' | 'fat' | 'muscle' | 'water' | 'visceral' | 'bmi'
+  label: string
+  text: string
+}
+
+/** Solo las métricas con dato en A y en B. La grasa va en puntos. */
+export function compareDeltas(a: CompareEntry, b: CompareEntry): CompareDelta[] {
+  const out: CompareDelta[] = []
+  const fmt = (v: number, unit: string) =>
+    `${v > 0 ? '↑' : v < 0 ? '↓' : '='} ${Math.abs(v).toFixed(1)} ${unit}`
+  if (a.weight != null && b.weight != null)
+    out.push({ key: 'weight', label: 'Peso', text: fmt(b.weight - a.weight, 'kg') })
+  if (a.fat != null && b.fat != null)
+    out.push({ key: 'fat', label: 'Grasa', text: fmt(b.fat - a.fat, 'puntos') })
+  if (a.muscle != null && b.muscle != null)
+    out.push({ key: 'muscle', label: 'Músculo', text: fmt(b.muscle - a.muscle, 'kg') })
+  if (a.water != null && b.water != null)
+    out.push({ key: 'water', label: 'Agua', text: fmt(b.water - a.water, 'puntos') })
+  if (a.visceral != null && b.visceral != null)
+    out.push({ key: 'visceral', label: 'Grasa visceral', text: fmt(b.visceral - a.visceral, '') })
+  if (a.bmi != null && b.bmi != null)
+    out.push({ key: 'bmi', label: 'IMC', text: fmt(b.bmi - a.bmi, '') })
+  return out.map((d) => ({ ...d, text: d.text.trim() }))
+}
+
+/* ─── Historia · Tendencias (dueña 7 oct 2026, estilo Fitness) ─────────────
+ *
+ * Una sola cuenta para las tarjetas de Historia. Cada número lleva su
+ * denominador, "día con comida" significa lo mismo en todas (calorías > 0,
+ * la misma vara que daysInDeficit) y "antes" solo se muestra con al menos
+ * MIN_PREV_DAYS días con dato (un promedio de 1 día no es "antes").
+ */
+
+export const MIN_PREV_DAYS = 5
+const MESES_TR = [
+  'ene',
+  'feb',
+  'mar',
+  'abr',
+  'may',
+  'jun',
+  'jul',
+  'ago',
+  'sep',
+  'oct',
+  'nov',
+  'dic',
+]
+const shortIso = (iso: string) =>
+  `${Number(iso.slice(8, 10))} ${MESES_TR[Number(iso.slice(5, 7)) - 1]}`
+const isWeekend = (iso: string) => {
+  const [y, m, d] = iso.split('-').map(Number) as [number, number, number]
+  const wd = new Date(y, m - 1, d, 12).getDay()
+  return wd === 0 || wd === 6
+}
+
+export type HistoryTrends = {
+  /** Una frase de hechos: qué mejoró contra el mes pasado (null si nada). */
+  summary: string | null
+  /** Qué tarjetas mejoraron contra el mes pasado (para ordenarlas y en oro). */
+  improved: { deficit: boolean; logging: boolean; workouts: boolean }
+  range: {
+    from: string
+    to: string
+    prevFrom: string
+    prevTo: string
+    label: string
+    prevLabel: string
+  }
+  deficit: {
+    value: number
+    denom: number
+    prev: { value: number; denom: number } | null
+    highlight: string | null
+  } | null
+  logging: { value: number; denom: number; prev: number | null; highlight: string | null }
+  protein: {
+    avg: number
+    n: number
+    prevAvg: number | null
+    inTarget: number | null
+    target: number | null
+    /** Gramos al día que faltan para la meta (null si ya la alcanza o no hay). */
+    gap: number | null
+  } | null
+  workouts: {
+    value: number
+    denom: number
+    prev: number | null
+    weeks: { label: string; days: number }[]
+  }
+}
+
+export function historyTrends(
+  signals: readonly DailySignals[],
+  ctx: {
+    today: string
+    calorieTarget: number | null
+    proteinTarget: number | null
+    windowDays?: number
+  },
+): HistoryTrends {
+  const win = ctx.windowDays ?? 30
+  const curStart = shiftIso(ctx.today, -win)
+  const prevStart = shiftIso(ctx.today, -2 * win)
+  const byDay = new Map<string, DailySignals>()
+  for (const s of signals) if (s.day) byDay.set(s.day, s)
+  const cur = [...byDay.values()].filter((s) => s.day! > curStart && s.day! <= ctx.today)
+  const prev = [...byDay.values()].filter((s) => s.day! > prevStart && s.day! <= curStart)
+  const food = (rows: DailySignals[]) => rows.filter((s) => s.calories != null && s.calories > 0)
+  const curFood = food(cur)
+  const prevFood = food(prev)
+
+  const range = {
+    from: shiftIso(curStart, 1),
+    to: ctx.today,
+    prevFrom: shiftIso(prevStart, 1),
+    prevTo: curStart,
+    label: `${shortIso(shiftIso(curStart, 1))} – ${shortIso(ctx.today)}`,
+    prevLabel: `${shortIso(shiftIso(prevStart, 1))} – ${shortIso(curStart)}`,
+  }
+
+  // Déficit: de tus días con comida.
+  let deficit: HistoryTrends['deficit'] = null
+  if (ctx.calorieTarget != null && curFood.length > 0) {
+    const hits = curFood.filter((s) => isDeficitDay(s.calories, ctx.calorieTarget))
+    const prevHits = prevFood.filter((s) => isDeficitDay(s.calories, ctx.calorieTarget))
+    const weekday = hits.filter((s) => !isWeekend(s.day!)).length
+    deficit = {
+      value: hits.length,
+      denom: curFood.length,
+      prev:
+        prevFood.length >= MIN_PREV_DAYS
+          ? { value: prevHits.length, denom: prevFood.length }
+          : null,
+      highlight:
+        hits.length >= 3
+          ? weekday > hits.length - weekday
+            ? 'Tus días en déficit fueron sobre todo entre semana.'
+            : weekday < hits.length - weekday
+              ? 'Tus días en déficit fueron sobre todo en fin de semana.'
+              : 'Tus días en déficit se repartieron entre semana y fin de semana.'
+          : null,
+    }
+  }
+
+  // Registro: días con comida de los días del periodo; la semana con más.
+  let best: { start: string; days: number } | null = null
+  for (let k = 0; k < Math.floor(win / 7); k++) {
+    const end = shiftIso(ctx.today, -7 * k)
+    const start = shiftIso(end, -6)
+    const days = curFood.filter((s) => s.day! >= start && s.day! <= end).length
+    if (days > 0 && (!best || days > best.days)) best = { start, days }
+  }
+  const logging = {
+    value: curFood.length,
+    denom: win,
+    prev: prev.length > 0 ? prevFood.length : null,
+    highlight: best
+      ? `Semana con más registro: ${shortIso(best.start)} – ${shortIso(shiftIso(best.start, 6))} (${best.days} ${best.days === 1 ? 'día' : 'días'})`
+      : null,
+  }
+
+  // Proteína: promedio en tus días con proteína registrada.
+  const withP = (rows: DailySignals[]) => rows.filter((s) => s.protein_g != null && s.protein_g > 0)
+  const curP = withP(cur)
+  const prevP = withP(prev)
+  const avg = (rows: DailySignals[]) =>
+    rows.reduce((a, s) => a + (s.protein_g ?? 0), 0) / rows.length
+  const protein =
+    curP.length > 0
+      ? {
+          avg: Math.round(avg(curP)),
+          n: curP.length,
+          prevAvg: prevP.length >= MIN_PREV_DAYS ? Math.round(avg(prevP)) : null,
+          inTarget:
+            ctx.proteinTarget != null
+              ? curP.filter((s) => (s.protein_g ?? 0) >= ctx.proteinTarget!).length
+              : null,
+          target: ctx.proteinTarget,
+          gap:
+            ctx.proteinTarget != null && Math.round(avg(curP)) < ctx.proteinTarget
+              ? ctx.proteinTarget - Math.round(avg(curP))
+              : null,
+        }
+      : null
+
+  // Entreno: días con entreno; barras de las últimas 4 semanas.
+  const trained = (rows: DailySignals[]) => rows.filter((s) => s.trained === true).length
+  const weeks: { label: string; days: number }[] = []
+  for (let k = 3; k >= 0; k--) {
+    const end = shiftIso(ctx.today, -7 * k)
+    const start = shiftIso(end, -6)
+    weeks.push({
+      label: shortIso(start),
+      days: cur.filter((s) => s.day! >= start && s.day! <= end && s.trained === true).length,
+    })
+  }
+  const workouts = {
+    value: trained(cur),
+    denom: win,
+    prev: prev.length > 0 ? trained(prev) : null,
+    weeks,
+  }
+
+  const improved = {
+    deficit: deficit?.prev != null && deficit.value > deficit.prev.value,
+    logging: logging.prev != null && logging.value > logging.prev,
+    workouts: workouts.prev != null && workouts.value > workouts.prev,
+  }
+  const parts = [
+    improved.logging ? 'registraste comida' : null,
+    improved.workouts ? 'entrenaste' : null,
+  ].filter(Boolean) as string[]
+  const summary =
+    parts.length > 0 || improved.deficit
+      ? `Este mes ${[...parts, improved.deficit ? 'tuviste días en déficit' : null]
+          .filter(Boolean)
+          .join(parts.length + (improved.deficit ? 1 : 0) > 2 ? ', ' : ' y ')
+          .replace(/, ([^,]*)$/, ' y $1')} más que el mes pasado.`
+      : null
+
+  return { summary, improved, range, deficit, logging, protein, workouts }
 }

@@ -21,6 +21,7 @@ import { queryKeys } from '@/lib/queryKeys'
 import { queryClient } from '@/lib/queryClient'
 import { SkyBackground } from '@/features/tabs/components'
 import { colors, typography } from '@/theme'
+import { requestBodyCompare } from '@/features/progress/pending-compare'
 
 /*
  * Importar mediciones (pedido dueña 15 jul 2026) — la tabla del coach entra
@@ -194,7 +195,9 @@ export default function ImportMeasurementsScreen() {
       .filter((d) => d < newest)
       .pop()
     if (prior) {
-      router.replace({ pathname: '/progress-analysis', params: { a: prior, b: newest } })
+      requestBodyCompare({ a: prior, b: newest })
+      router.back()
+      router.navigate('/progress')
     } else {
       router.replace('/progress-table')
     }

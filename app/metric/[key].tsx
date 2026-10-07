@@ -1,56 +1,77 @@
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { useMemo } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
-import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated'
+import Animated, { FadeIn } from 'react-native-reanimated'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import Svg, { Path } from 'react-native-svg'
 
 import { useCyclePhase } from '@/features/cycle/useCyclePhase'
 import { useMacroTargets } from '@/features/macros/hooks'
 import { useSignalsHistory } from '@/features/orbit/hooks'
 import { BeforeAfterSlider } from '@/features/progress/components/BeforeAfterSlider'
-import { MetricChart } from '@/features/progress/components/MetricChart'
+import { CountUp } from '@/features/progress/components/CountUp'
+import { HealthCardHeader } from '@/features/progress/components/HealthCardHeader'
+import {
+  DropGlyph,
+  DumbbellGlyph,
+  FatGlyph,
+  FramesGlyph,
+  ListGlyph,
+  ScaleGlyph,
+} from '@/features/progress/components/HealthGlyphs'
+import { WeightChart } from '@/features/progress/components/WeightChart'
 import { PROGRESS_COMPARE_WINDOW_DAYS } from '@/features/progress/constants'
 import { useGatedCompositionSeries, usePhotoTimeline } from '@/features/progress/hooks'
 import {
+  SERIES_SOURCE_LABEL,
   checkinSeries,
   compareHistory,
-  compareSynthesis,
   photoNear,
   proteinAverageComparison,
+  sameSourceChange,
   zoneEvolution,
-  type CheckinDeltaKey,
   type SeriesPoint,
 } from '@/features/progress/logic'
 import { METRIC_CONFIG, type MetricKey } from '@/features/progress/metric-config'
+import { requestBodyCompare } from '@/features/progress/pending-compare'
 import { SkyBackground } from '@/features/tabs/components'
 import { todayInTimezone } from '@/lib/time'
 import { colors, typography } from '@/theme'
 
 /*
- * Detalle por métrica (Epic 08 · F1) — UNA pantalla parametrizada para
- * grasa/músculo/agua/visceral/IMC (el peso tiene la suya: /weight-trend).
- * Estructura: hero (valor de hoy) → gráfica → historial → contexto propio de
- * la métrica → interpretación del motor como reflexión (sin ✦, sin promesas).
- *
- * Variantes: grasa trae zonas + fotos de sus extremos; músculo trae entrenos
- * y proteína (sus palancas); agua trae el ciclo; visceral e IMC solo contexto
- * COTIDIANO (jamás rangos/"zonas sanas": línea roja del manifiesto; el IMC
- * además no es protagonista — su CTA es la tabla, no un comparador).
+ * Detalle de una métrica de composición (dueña 7 oct 2026: "fuertemente
+ * inspirado en Fitness y Salud"). El mismo lenguaje que Peso: encabezado con
+ * el ícono de su categoría, la última medición con fecha y fuente, el cambio
+ * SOLO entre mediciones de la misma fuente (un InBody contra una báscula de
+ * Salud no es un cambio), la gráfica, promedio / mínimo / máximo, el contexto
+ * propio de la métrica en tarjetas y todos los registros. Sin frases.
  */
 
 type DetailKey = Exclude<MetricKey, 'peso'>
-const SYNTH_KEY: Partial<Record<DetailKey, CheckinDeltaKey>> = {
-  grasa: 'body_fat_pct',
-  musculo: 'muscle_kg',
-  agua: 'water_pct',
-}
+type Period = 'H' | 'Y' | 'ALL'
+const PERIODS: { key: Period; label: string; a11y: string; days: number | null }[] = [
+  { key: 'H', label: '6M', a11y: '6 meses', days: 182 },
+  { key: 'Y', label: 'A', a11y: 'Año', days: 365 },
+  { key: 'ALL', label: 'Todo', a11y: 'Todo', days: null },
+]
+const COMPARABLE: DetailKey[] = ['grasa', 'musculo', 'agua']
 
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
 const fmtDay = (iso: string): string =>
   `${Number(iso.slice(8, 10))} ${MESES[Number(iso.slice(5, 7)) - 1]} ${iso.slice(0, 4)}`
-const fmtVal = (v: number, unit: string) =>
-  `${v % 1 === 0 ? v : v.toFixed(1)}${unit ? ` ${unit}` : ''}`
+const fmtShort = (iso: string): string =>
+  `${Number(iso.slice(8, 10))} ${MESES[Number(iso.slice(5, 7)) - 1]}`
+const toT = (iso: string): number => {
+  const [y, m, d] = iso.split('-').map(Number) as [number, number, number]
+  return new Date(y, m - 1, d, 12).getTime()
+}
+const fmtNum = (v: number) => (v % 1 === 0 ? String(v) : v.toFixed(1))
+
+function MetricIcon({ k, color, size }: { k: DetailKey; color: string; size?: number }) {
+  if (k === 'musculo') return <DumbbellGlyph size={size ?? 18} color={color} />
+  if (k === 'agua') return <DropGlyph size={size ?? 18} color={color} />
+  if (k === 'imc') return <ScaleGlyph size={size ?? 18} color={color} />
+  return <FatGlyph size={size ?? 18} color={color} />
+}
 
 export default function MetricDetailScreen() {
   const router = useRouter()
@@ -61,26 +82,12 @@ export default function MetricDetailScreen() {
       : 'grasa'
   ) as DetailKey
   const cfg = METRIC_CONFIG[key]
+  const [period, setPeriod] = useState<Period>('ALL')
+  const [showAll, setShowAll] = useState(false)
 
   const { series, isPending, checkins } = useGatedCompositionSeries()
   const photosQ = usePhotoTimeline()
   const cycle = useCyclePhase()
-
-  // Contexto de músculo: entrenos 30v30 + proteína promedio (sus palancas).
-  const signals = useSignalsHistory(key === 'musculo' ? PROGRESS_COMPARE_WINDOW_DAYS * 2 + 5 : 0)
-  const targets = useMacroTargets().data
-  const muscleCtx = useMemo(() => {
-    if (key !== 'musculo' || !signals.data) return null
-    const ctx = {
-      today: todayInTimezone(),
-      calorieTarget: targets?.calories ?? null,
-      proteinTarget: targets?.protein_g ?? null,
-      windowDays: PROGRESS_COMPARE_WINDOW_DAYS,
-    }
-    const workouts = compareHistory(signals.data, [], ctx).metrics.find((m) => m.key === 'workouts')
-    const protein = proteinAverageComparison(signals.data, ctx)
-    return { workouts, protein }
-  }, [key, signals.data, targets?.calories, targets?.protein_g])
 
   const serie: SeriesPoint[] = useMemo(() => {
     switch (key) {
@@ -97,7 +104,46 @@ export default function MetricDetailScreen() {
     }
   }, [key, series, checkins.data])
 
-  // Zonas + fotos: solo para grasa.
+  const inRange = useMemo(() => {
+    const days = PERIODS.find((p) => p.key === period)?.days ?? null
+    if (days == null) return serie
+    const since = Date.now() - days * 24 * 60 * 60 * 1000
+    return serie.filter((p) => toT(p.day) >= since)
+  }, [serie, period])
+
+  const last = serie[serie.length - 1]
+  const change = sameSourceChange(inRange)
+  // % se compara en puntos (dueña: grasa y agua en puntos, nunca "+5 %").
+  const changeUnit = cfg.unit === '%' ? 'puntos' : cfg.unit
+  // Con mediciones de años distintos, las fechas cortas llevan el año.
+  const crossYear =
+    inRange.length > 1 &&
+    inRange[0]!.day.slice(0, 4) !== inRange[inRange.length - 1]!.day.slice(0, 4)
+  const fmtStat = (iso: string) => (crossYear ? fmtDay(iso) : fmtShort(iso))
+  const stats = useMemo(() => {
+    if (inRange.length === 0) return null
+    const avg = inRange.reduce((a, p) => a + p.value, 0) / inRange.length
+    const min = inRange.reduce((a, p) => (p.value < a.value ? p : a))
+    const max = inRange.reduce((a, p) => (p.value > a.value ? p : a))
+    return { avg, min, max }
+  }, [inRange])
+
+  // Contexto de músculo: entrenos y proteína, 30 días contra los 30 previos.
+  const signals = useSignalsHistory(key === 'musculo' ? PROGRESS_COMPARE_WINDOW_DAYS * 2 + 5 : 0)
+  const targets = useMacroTargets().data
+  const muscleCtx = useMemo(() => {
+    if (key !== 'musculo' || !signals.data) return null
+    const ctx = {
+      today: todayInTimezone(),
+      calorieTarget: targets?.calories ?? null,
+      proteinTarget: targets?.protein_g ?? null,
+      windowDays: PROGRESS_COMPARE_WINDOW_DAYS,
+    }
+    const workouts = compareHistory(signals.data, [], ctx).metrics.find((m) => m.key === 'workouts')
+    const protein = proteinAverageComparison(signals.data, ctx)
+    return { workouts, protein }
+  }, [key, signals.data, targets?.calories, targets?.protein_g])
+
   const zones = useMemo(
     () => (key === 'grasa' ? zoneEvolution(checkins.data ?? []).zones : []),
     [key, checkins.data],
@@ -110,189 +156,247 @@ export default function MetricDetailScreen() {
     return a?.signed_url && b?.signed_url && a.id !== b.id ? { a, b } : null
   }, [key, serie, photosQ.data])
 
-  const first = serie[0]
-  const last = serie[serie.length - 1]
-  const delta =
-    first && last && serie.length > 1 ? Number((last.value - first.value).toFixed(1)) : null
+  const newestFirst = [...serie].reverse()
+  const listed = showAll ? newestFirst : newestFirst.slice(0, 10)
 
-  // La reflexión del motor (misma voz honesta del comparador) para las
-  // métricas con dirección; visceral/IMC solo llevan su explainer.
-  const synthesis = useMemo(() => {
-    const synthKey = SYNTH_KEY[key]
-    if (!synthKey || !first || !last || delta == null || delta === 0) return null
-    return compareSynthesis([{ key: synthKey, a: first.value, b: last.value, delta }], {
-      rescueCloser: false,
-    })
-  }, [key, first, last, delta])
-
-  const historial = useMemo(() => [...serie].reverse().slice(0, 8), [serie])
-
-  // CTA: comparar mediciones (grasa/músculo/agua); visceral/IMC → la tabla
-  // (sin protagonismo).
   const checkinDays = (checkins.data ?? []).map((c) => c.measured_on)
-  const canCompare = checkinDays.length >= 2 && SYNTH_KEY[key] != null
+  const canCompare = checkinDays.length >= 2 && COMPARABLE.includes(key)
   const openCompare = () => {
     const a = checkinDays[checkinDays.length - 2]
     const b = checkinDays[checkinDays.length - 1]
-    if (a && b) router.push({ pathname: '/progress-analysis', params: { a, b } })
+    if (!a || !b) return
+    requestBodyCompare({ a, b })
+    router.back()
+    router.navigate('/progress')
   }
 
   return (
     <View style={styles.screen}>
       <SkyBackground />
       <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.title}>{cfg.label}</Text>
-            <Text style={styles.sub}>{cfg.question}</Text>
-          </View>
+        <View style={styles.topBar}>
+          <Text style={styles.screenTitle}>{cfg.label}</Text>
           <Pressable
             onPress={() => router.back()}
             hitSlop={12}
             accessibilityRole="button"
             accessibilityLabel="Cerrar"
           >
-            <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
-              <Path
-                d="M6 6 L18 18 M18 6 L6 18"
-                stroke={colors.bone}
-                strokeWidth={2.2}
-                strokeLinecap="round"
-              />
-            </Svg>
+            <Text style={styles.close}>✕</Text>
           </Pressable>
         </View>
 
         {isPending ? (
           <View style={styles.skeleton}>
-            {Array.from({ length: 4 }, (_, i) => (
+            {Array.from({ length: 3 }, (_, i) => (
               <View key={i} style={styles.skeletonRow} />
             ))}
           </View>
         ) : !last ? (
-          <Text style={styles.empty}>Aún no hay mediciones de {cfg.label.toLowerCase()}.</Text>
+          <Text style={styles.empty}>{`Aún no hay mediciones de ${cfg.label.toLowerCase()}.`}</Text>
         ) : (
           <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-            {/* Hero: el valor de hoy (fechado), con su variación total. */}
-            <Animated.View entering={FadeInDown.duration(420)}>
-              <Text style={styles.heroDate}>Última medición · {fmtDay(last.day)}</Text>
-              <View style={styles.heroRow}>
-                <Text style={[styles.heroNum, key === 'imc' && styles.heroNumQuiet]}>
-                  {last.value % 1 === 0 ? last.value : last.value.toFixed(1)}
-                </Text>
-                {cfg.unit ? <Text style={styles.heroUnit}>{cfg.unit}</Text> : null}
+            <Animated.View entering={FadeIn.duration(320)} style={styles.card}>
+              <HealthCardHeader
+                icon={<MetricIcon k={key} color={cfg.hue} />}
+                title="Última medición"
+                color={cfg.hue}
+                right={`${last.day.slice(0, 4) === String(new Date().getFullYear()) ? fmtShort(last.day) : fmtDay(last.day)}${last.source ? ` · ${SERIES_SOURCE_LABEL[last.source]}` : ''}`}
+              />
+              <View style={styles.numbers}>
+                <View style={styles.valueRow}>
+                  <CountUp
+                    value={last.value}
+                    decimals={last.value % 1 === 0 ? 0 : 1}
+                    style={styles.value}
+                  />
+                  {cfg.unit ? <Text style={styles.unit}>{cfg.unit}</Text> : null}
+                </View>
+                {change ? (
+                  <View style={styles.changeCol}>
+                    <Text style={styles.change}>
+                      {`${change.abs > 0 ? '↑' : change.abs < 0 ? '↓' : '='} ${fmtNum(Math.abs(change.abs))}${changeUnit ? ` ${changeUnit}` : ''}`}
+                    </Text>
+                    <Text
+                      style={styles.caption}
+                    >{`desde el ${change.fromDay.slice(0, 4) === last.day.slice(0, 4) ? fmtShort(change.fromDay) : fmtDay(change.fromDay)}`}</Text>
+                  </View>
+                ) : null}
               </View>
-              {delta != null && delta !== 0 && first ? (
-                <Text style={[styles.heroDelta, { color: cfg.hue }]}>
-                  {fmtVal(first.value, cfg.unit)} → {fmtVal(last.value, cfg.unit)} ·{' '}
-                  {delta > 0 ? '+' : '−'}
-                  {fmtVal(Math.abs(delta), cfg.unit)}
-                </Text>
+
+              <View style={styles.periods}>
+                {PERIODS.map((p) => {
+                  const on = p.key === period
+                  return (
+                    <Pressable
+                      key={p.key}
+                      onPress={() => setPeriod(p.key)}
+                      accessibilityRole="button"
+                      accessibilityLabel={p.a11y}
+                      accessibilityState={{ selected: on }}
+                      style={[styles.periodSeg, on && styles.periodSegOn]}
+                    >
+                      <Text style={[styles.periodText, on && styles.periodTextOn]}>{p.label}</Text>
+                    </Pressable>
+                  )
+                })}
+              </View>
+
+              {inRange.length > 0 ? (
+                <WeightChart
+                  points={inRange.map((p) => ({
+                    t: toT(p.day),
+                    weight: p.value,
+                    source: p.source,
+                  }))}
+                  unit={cfg.unit}
+                  color={cfg.hue}
+                  sourceLabel={(s) => SERIES_SOURCE_LABEL[s as 'checkin' | 'wearable'] ?? s}
+                />
+              ) : (
+                <Text style={styles.emptyRange}>Sin mediciones en este periodo.</Text>
+              )}
+
+              {stats ? (
+                <View style={styles.stats}>
+                  <Stat
+                    label="Promedio"
+                    value={`${fmtNum(stats.avg)}${cfg.unit ? ` ${cfg.unit}` : ''}`}
+                    sub={`${inRange.length} ${inRange.length === 1 ? 'medición' : 'mediciones'}`}
+                  />
+                  <Stat
+                    label="Mínimo"
+                    value={`${fmtNum(stats.min.value)}${cfg.unit ? ` ${cfg.unit}` : ''}`}
+                    sub={fmtStat(stats.min.day)}
+                  />
+                  <Stat
+                    label="Máximo"
+                    value={`${fmtNum(stats.max.value)}${cfg.unit ? ` ${cfg.unit}` : ''}`}
+                    sub={fmtStat(stats.max.day)}
+                  />
+                </View>
               ) : null}
+              {cfg.explainer ? <Text style={styles.caption}>{cfg.explainer}</Text> : null}
             </Animated.View>
 
-            {/* La gráfica. */}
-            {serie.length >= 2 ? (
-              <Animated.View entering={FadeIn.duration(420).delay(120)} style={styles.chartWrap}>
-                <MetricChart serie={serie} hue={cfg.hue} height={190} />
-              </Animated.View>
-            ) : null}
-
-            {/* Contexto propio de la métrica. */}
             {key === 'grasa' && zones.length > 0 ? (
-              <View style={styles.block}>
-                <Text style={styles.blockTitle}>Por zona</Text>
+              <ContextCard
+                delay={80}
+                icon={<FatGlyph color={cfg.hue} />}
+                title="Por zona"
+                color={cfg.hue}
+                right="Primera → última"
+              >
                 {zones.map((z) => (
-                  <View key={z.key} style={styles.row}>
-                    <Text style={styles.rowLabel}>
-                      {z.key === 'arms' ? 'Brazos' : z.key === 'trunk' ? 'Tronco' : 'Piernas'}
-                    </Text>
-                    <Text style={styles.rowValue}>
-                      {z.first.toFixed(1)} % → {z.last.toFixed(1)} %
-                    </Text>
-                  </View>
+                  <Row
+                    key={z.key}
+                    label={z.key === 'arms' ? 'Brazos' : z.key === 'trunk' ? 'Tronco' : 'Piernas'}
+                    value={`${z.first.toFixed(1)} → ${z.last.toFixed(1)} %`}
+                  />
                 ))}
-              </View>
+              </ContextCard>
             ) : null}
 
             {key === 'grasa' && photoPair ? (
-              <View style={styles.block}>
-                <Text style={styles.blockTitle}>Tus fotos en esas fechas</Text>
+              <ContextCard
+                delay={140}
+                icon={<FramesGlyph color={colors.oroSoft} />}
+                title="Tus fotos"
+                color={colors.oroSoft}
+                right={`${fmtShort(serie[0]!.day)} → ${fmtShort(serie[serie.length - 1]!.day)}`}
+              >
                 <BeforeAfterSlider
                   beforeUrl={photoPair.a.signed_url!}
                   afterUrl={photoPair.b.signed_url!}
                   leftLabel={fmtDay(serie[0]!.day)}
                   rightLabel={fmtDay(serie[serie.length - 1]!.day)}
                 />
-              </View>
+              </ContextCard>
             ) : null}
 
-            {key === 'musculo' && muscleCtx ? (
-              <View style={styles.block}>
-                {/* Label factual, sin framing de "palancas hacia construir"
-                    (manifesto-review: descriptivo, no coach de recomposición). */}
-                <Text style={styles.blockTitle}>Entrenos y proteína · últimos 30 días</Text>
+            {key === 'musculo' && muscleCtx && (muscleCtx.workouts || muscleCtx.protein) ? (
+              <ContextCard
+                delay={80}
+                icon={<DumbbellGlyph color={colors.dimension.cuerpo} />}
+                title="Entrenos y proteína"
+                color={colors.dimension.cuerpo}
+                right="30 días vs 30 previos"
+              >
                 {muscleCtx.workouts ? (
-                  <View style={styles.row}>
-                    <Text style={styles.rowLabel}>Entrenos</Text>
-                    <Text style={styles.rowValue}>
-                      antes {muscleCtx.workouts.previous} · ahora {muscleCtx.workouts.current}
-                    </Text>
-                  </View>
+                  <Row
+                    label="Entrenos"
+                    value={`${muscleCtx.workouts.previous} → ${muscleCtx.workouts.current}`}
+                  />
                 ) : null}
                 {muscleCtx.protein ? (
-                  <View style={styles.row}>
-                    <Text style={styles.rowLabel}>Proteína al día</Text>
-                    <Text style={styles.rowValue}>
-                      antes {muscleCtx.protein.previous} g · ahora {muscleCtx.protein.current} g
-                    </Text>
-                  </View>
+                  <Row
+                    label="Proteína al día"
+                    value={`${muscleCtx.protein.previous} → ${muscleCtx.protein.current} g`}
+                  />
                 ) : null}
-              </View>
+              </ContextCard>
             ) : null}
 
             {key === 'agua' && cycle && (cycle.phase === 'lutea' || cycle.phase === 'menstrual') ? (
-              <Text style={styles.cycleNote}>
-                Estás en días en que el cuerpo retiene agua por el ciclo. Que suba no significa que
-                algo esté mal.
-              </Text>
+              <ContextCard
+                delay={80}
+                icon={<DropGlyph color={colors.oroSoft} />}
+                title="Ciclo"
+                color={colors.oroSoft}
+                right={`Día ${cycle.day}`}
+              >
+                <Text style={styles.cardText}>
+                  En estos días del ciclo el cuerpo retiene más agua.
+                </Text>
+              </ContextCard>
             ) : null}
 
-            {/* Historial: hechos fechados. */}
-            {historial.length > 1 ? (
-              <View style={styles.block}>
-                <Text style={styles.blockTitle}>Historial</Text>
-                {historial.map((p) => (
-                  <View key={p.day} style={styles.row}>
-                    <Text style={styles.rowLabel}>{fmtDay(p.day)}</Text>
-                    <Text style={styles.rowValue}>{fmtVal(p.value, cfg.unit)}</Text>
+            <View style={styles.listHead}>
+              <ListGlyph color={colors.bone} />
+              <Text style={styles.listTitle}>Todos los registros</Text>
+            </View>
+            <View style={styles.list}>
+              {listed.map((p, i) => (
+                <Animated.View
+                  key={`${p.day}-${p.source ?? ''}`}
+                  entering={FadeIn.duration(240).delay(Math.min(i, 8) * 40)}
+                  style={[styles.row, i > 0 && styles.rowDivider]}
+                >
+                  <View style={styles.rowText}>
+                    <Text style={styles.rowDate}>{fmtDay(p.day)}</Text>
+                    {p.source ? (
+                      <Text style={styles.caption}>{SERIES_SOURCE_LABEL[p.source]}</Text>
+                    ) : null}
                   </View>
-                ))}
-              </View>
+                  <Text style={styles.rowValue}>
+                    {`${fmtNum(p.value)}${cfg.unit ? ` ${cfg.unit}` : ''}`}
+                  </Text>
+                </Animated.View>
+              ))}
+            </View>
+            {newestFirst.length > 10 ? (
+              <Pressable onPress={() => setShowAll((v) => !v)} accessibilityRole="button">
+                <Text style={styles.more}>
+                  {showAll ? 'Ver menos' : `Ver todos (${newestFirst.length})`}
+                </Text>
+              </Pressable>
             ) : null}
 
-            {/* La reflexión (motor, sin ✦) o el contexto cotidiano. */}
-            {synthesis ? <Text style={styles.reflection}>{synthesis}</Text> : null}
-            {cfg.explainer ? <Text style={styles.explainer}>{cfg.explainer}</Text> : null}
-
-            {/* UN CTA por pantalla. Visceral/IMC sin protagonismo: link a la tabla. */}
             {canCompare ? (
               <Pressable
                 onPress={openCompare}
                 accessibilityRole="button"
-                accessibilityLabel="Comparar dos mediciones"
-                style={({ pressed }) => [styles.cta, pressed && { opacity: 0.85 }]}
+                style={({ pressed }) => [styles.cta, pressed && styles.pressed]}
               >
-                <Text style={styles.ctaText}>Comparar mis mediciones →</Text>
+                <Text style={styles.ctaText}>Comparar en Antes y ahora</Text>
               </Pressable>
             ) : (
               <Pressable
                 onPress={() => router.push('/progress-table')}
-                accessibilityRole="link"
-                accessibilityLabel="Ver la tabla completa"
-                style={({ pressed }) => [styles.tableLink, pressed && { opacity: 0.6 }]}
+                accessibilityRole="button"
+                style={({ pressed }) => [styles.cta, pressed && styles.pressed]}
               >
-                <Text style={styles.tableLinkText}>Ver en la tabla completa →</Text>
+                <Text style={styles.ctaText}>Ver en la tabla</Text>
               </Pressable>
             )}
 
@@ -306,152 +410,216 @@ export default function MetricDetailScreen() {
   )
 }
 
+function ContextCard({
+  icon,
+  title,
+  color,
+  right,
+  delay,
+  children,
+}: {
+  icon: ReactNode
+  title: string
+  color: string
+  right?: string
+  delay: number
+  children: ReactNode
+}) {
+  return (
+    <Animated.View entering={FadeIn.duration(320).delay(delay)} style={styles.card}>
+      <HealthCardHeader icon={icon} title={title} color={color} right={right} />
+      <View style={styles.cardBody}>{children}</View>
+    </Animated.View>
+  )
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.ctxRow}>
+      <Text style={styles.ctxLabel}>{label}</Text>
+      <Text style={styles.ctxValue}>{value}</Text>
+    </View>
+  )
+}
+
+function Stat({ label, value, sub }: { label: string; value: string; sub: string }) {
+  return (
+    <View style={styles.stat}>
+      <Text style={styles.statLabel}>{label}</Text>
+      <Text style={styles.statValue}>{value}</Text>
+      <Text style={styles.caption}>{sub}</Text>
+    </View>
+  )
+}
+
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   safe: { flex: 1 },
-  header: {
+  topBar: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 6,
+    paddingTop: 12,
+    paddingBottom: 8,
   },
-  title: {
-    fontFamily: typography.displayHeavy,
-    fontSize: typography.sizes.headingLg,
+  screenTitle: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.displaySm,
     color: colors.leche,
-    letterSpacing: -0.5,
   },
-  sub: {
-    marginTop: 2,
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
+  close: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.headingLg,
+    color: colors.bone,
+  },
+  skeleton: { paddingHorizontal: 20, paddingTop: 20, gap: 12 },
+  skeletonRow: { height: 64, borderRadius: 16, backgroundColor: colors.bgCard, opacity: 0.6 },
+  empty: {
+    paddingHorizontal: 20,
+    paddingTop: 40,
+    textAlign: 'center',
+    fontFamily: typography.uiMedium,
     fontSize: typography.sizes.body,
     color: colors.niebla,
   },
-  skeleton: { paddingHorizontal: 20, paddingTop: 20, gap: 12 },
-  skeletonRow: { height: 44, borderRadius: 12, backgroundColor: colors.bgCard, opacity: 0.6 },
-  empty: {
-    marginTop: 30,
-    paddingHorizontal: 24,
+  content: { paddingHorizontal: 20, paddingBottom: 48, gap: 12 },
+  card: { borderRadius: 20, backgroundColor: colors.bgCard, padding: 16, gap: 14 },
+  cardBody: { gap: 2 },
+  cardText: {
     fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.bodyLarge,
-    color: colors.bone,
-    textAlign: 'center',
+    fontSize: typography.sizes.body,
+    lineHeight: 19,
+    color: colors.leche,
   },
-  content: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 48 },
-  heroDate: {
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.micro,
-    letterSpacing: 0.4,
-    color: colors.niebla,
-    marginBottom: 4,
-    fontVariant: ['tabular-nums'],
-  },
-  heroRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
-  heroNum: {
-    fontFamily: typography.displayHeavy,
+  numbers: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' },
+  valueRow: { flexDirection: 'row', alignItems: 'baseline', gap: 5 },
+  value: {
+    fontFamily: typography.uiBold,
     fontSize: typography.sizes.statHero,
-    letterSpacing: -1,
+    letterSpacing: -1.5,
     color: colors.leche,
     fontVariant: ['tabular-nums'],
   },
-  // El IMC no es protagonista ni en su propia pantalla.
-  heroNumQuiet: { fontSize: typography.sizes.displayLg, color: colors.bone },
-  heroUnit: {
-    fontFamily: typography.displayMedium,
-    fontSize: typography.sizes.headingLg,
-    color: colors.bone,
-  },
-  heroDelta: {
-    marginTop: 6,
+  unit: { fontFamily: typography.uiBold, fontSize: typography.sizes.bodyLarge, color: colors.bone },
+  changeCol: { alignItems: 'flex-end', gap: 1 },
+  change: {
     fontFamily: typography.uiBold,
-    fontSize: typography.sizes.bodyLarge,
+    fontSize: typography.sizes.headingLg,
+    color: colors.leche,
     fontVariant: ['tabular-nums'],
   },
-  chartWrap: { marginTop: 14 },
-  block: { marginTop: 34 },
-  blockTitle: {
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.smallLabel,
-    letterSpacing: 1.6,
-    textTransform: 'uppercase',
-    color: colors.oroSoft,
-    marginBottom: 8,
+  caption: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    color: colors.niebla,
   },
+  periods: {
+    flexDirection: 'row',
+    padding: 3,
+    gap: 2,
+    borderRadius: 10,
+    backgroundColor: colors.bgCard2,
+  },
+  periodSeg: {
+    flex: 1,
+    height: 30,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  periodSegOn: { backgroundColor: colors.magentaTint2 },
+  periodText: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.label,
+    color: colors.bone,
+  },
+  periodTextOn: { fontFamily: typography.uiBold, color: colors.leche },
+  emptyRange: {
+    paddingVertical: 32,
+    textAlign: 'center',
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    color: colors.niebla,
+  },
+  stats: {
+    flexDirection: 'row',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.hairline,
+    paddingTop: 12,
+  },
+  stat: { flex: 1, gap: 2 },
+  statLabel: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.label,
+    color: colors.bone,
+  },
+  statValue: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.heading,
+    color: colors.leche,
+    fontVariant: ['tabular-nums'],
+  },
+  ctxRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 9,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.hairline,
+  },
+  ctxLabel: { fontFamily: typography.uiMedium, fontSize: typography.sizes.ui, color: colors.bone },
+  ctxValue: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.ui,
+    color: colors.leche,
+    fontVariant: ['tabular-nums'],
+  },
+  listHead: { marginTop: 12, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  listTitle: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.headingLg,
+    color: colors.leche,
+  },
+  list: { borderRadius: 20, backgroundColor: colors.bgCard, overflow: 'hidden' },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 10,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.05)',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
   },
-  rowLabel: {
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.body,
-    color: colors.bone,
+  rowDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.hairline },
+  rowText: { gap: 2 },
+  rowDate: { fontFamily: typography.uiSemi, fontSize: typography.sizes.ui, color: colors.leche },
+  rowValue: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.ui,
+    color: colors.leche,
     fontVariant: ['tabular-nums'],
   },
-  rowValue: {
+  more: {
+    textAlign: 'center',
+    paddingVertical: 8,
     fontFamily: typography.uiSemi,
     fontSize: typography.sizes.body,
-    color: colors.leche,
-    fontVariant: ['tabular-nums'],
-  },
-  cycleNote: {
-    marginTop: 24,
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.body,
-    lineHeight: 20,
-    color: colors.niebla,
-  },
-  reflection: {
-    marginTop: 34,
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.title,
-    lineHeight: 25,
-    color: colors.leche,
-  },
-  explainer: {
-    marginTop: 20,
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.bodyLarge,
-    lineHeight: 22,
     color: colors.bone,
   },
   cta: {
-    marginTop: 36,
-    minHeight: 50,
+    marginTop: 8,
+    height: 48,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 14,
-    backgroundColor: colors.magentaTint,
-    borderWidth: 1.5,
-    borderColor: colors.magentaGlow,
+    backgroundColor: colors.magentaTint2,
   },
-  ctaText: {
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.label,
-    color: colors.magentaHot,
-  },
-  tableLink: { marginTop: 32, alignSelf: 'center', paddingVertical: 6, paddingHorizontal: 8 },
-  tableLinkText: {
-    fontFamily: typography.uiSemi,
-    fontSize: typography.sizes.body,
-    color: colors.niebla,
-    letterSpacing: 0.2,
-  },
+  ctaText: { fontFamily: typography.uiBold, fontSize: typography.sizes.ui, color: colors.leche },
+  pressed: { opacity: 0.75 },
   disclaimer: {
-    marginTop: 16,
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.micro,
-    color: colors.niebla,
+    marginTop: 8,
     textAlign: 'center',
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    color: colors.niebla,
   },
 })

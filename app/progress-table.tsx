@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router'
 import { useMemo, useRef, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import Animated, { FadeIn } from 'react-native-reanimated'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import Svg, { Path } from 'react-native-svg'
 
@@ -11,6 +12,8 @@ import { useBodyCheckins } from '@/features/progress/hooks'
 import { checkinTable } from '@/features/progress/logic'
 import { AiImportPill } from '@/features/progress/components/AiImportPill'
 import { LinkCta } from '@/features/progress/components/LinkCta'
+import { DumbbellGlyph, FatGlyph, ScaleGlyph } from '@/features/progress/components/HealthGlyphs'
+import { MeasurementsSummary } from '@/features/progress/components/MeasurementsSummary'
 import { Sparkline } from '@/features/progress/components/Sparkline'
 import { SkyBackground } from '@/features/tabs/components'
 import { colors, typography } from '@/theme'
@@ -56,6 +59,8 @@ export default function ProgressTableScreen() {
   const table = useMemo(() => checkinTable(data ?? []), [data])
   const lastIdx = table.cols.length - 1
   const railRef = useRef<ScrollView>(null)
+  // Resumen primero (estilo Salud); la tabla del coach a un toque.
+  const [view, setView] = useState<'resumen' | 'tabla'>('resumen')
 
   const openCheckin = (col: { day: string; source: string }) =>
     router.push({ pathname: '/log-checkin', params: { day: col.day, source: col.source } })
@@ -92,9 +97,13 @@ export default function ProgressTableScreen() {
       <SkyBackground />
       <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
         <View style={styles.header}>
-          <View>
-            <Text style={styles.title}>Tabla completa</Text>
-            <Text style={styles.sub}>Tus mediciones, tal cual · toca una fecha para editarla</Text>
+          <View style={styles.headerText}>
+            <Text style={styles.title}>Mediciones</Text>
+            <Text style={styles.sub}>
+              {view === 'resumen'
+                ? 'Tus mediciones completas. Toca una fecha para ver todo.'
+                : 'Tal cual, fecha por fecha. Toca una fecha para editarla.'}
+            </Text>
           </View>
           <Pressable
             onPress={() => router.back()}
@@ -160,164 +169,213 @@ export default function ProgressTableScreen() {
           </View>
         ) : (
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
-            <View style={styles.tableRow}>
-              {/* Columna FIJA de métricas (si las fechas scrollean, los nombres
+            <View style={styles.segments}>
+              {(['resumen', 'tabla'] as const).map((v) => {
+                const on = v === view
+                return (
+                  <Pressable
+                    key={v}
+                    onPress={() => setView(v)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: on }}
+                    style={[styles.segment, on && styles.segmentOn]}
+                  >
+                    <Text style={[styles.segmentText, on && styles.segmentTextOn]}>
+                      {v === 'resumen' ? 'Resumen' : 'Tabla'}
+                    </Text>
+                  </Pressable>
+                )
+              })}
+            </View>
+
+            {view === 'resumen' ? (
+              <MeasurementsSummary
+                checkins={data ?? []}
+                onEdit={openCheckin}
+                onOpen={(route) => router.push(route as never)}
+              />
+            ) : (
+              <Animated.View entering={FadeIn.duration(360)} style={styles.tableRow}>
+                {/* Columna FIJA de métricas (si las fechas scrollean, los nombres
                   se quedan — "si 'Peso' desaparece me pierdo en dos segundos"). */}
-              <View>
-                <View style={[styles.cornerCell, { height: ROW_H }]} />
-                {table.groups.map((g) => (
-                  <View key={g.title}>
-                    <View style={[styles.groupCell, { height: GROUP_H }]}>
-                      <Text style={styles.groupText}>{g.title}</Text>
-                    </View>
-                    {g.rows.map((r, ri) => {
-                      // Jerarquía de ESTRUCTURA (no de valor): en Músculo y
-                      // Grasa la fila Total es la que se escanea; los
-                      // segmentos bajan un tono.
-                      const segment =
-                        (g.title === 'Músculo' || g.title === 'Grasa') && r.label !== 'Total'
-                      return (
-                        <View
-                          key={r.key}
-                          style={[
-                            styles.labelCell,
-                            { height: ROW_H },
-                            ri % 2 === 1 && styles.zebra,
-                          ]}
-                        >
-                          <Text
-                            style={[styles.labelText, segment && styles.labelTextSegment]}
-                            numberOfLines={1}
-                          >
-                            {r.label}
-                            {r.unit ? <Text style={styles.labelUnit}> {r.unit}</Text> : null}
-                          </Text>
-                        </View>
-                      )
-                    })}
-                  </View>
-                ))}
-              </View>
-
-              {/* Columnas de fechas (scroll horizontal) + tendencia al final.
-                  Arranca al FINAL: "la de ahora" es lo primero que buscas; el
-                  peek parcial queda del lado del pasado. */}
-              <ScrollView
-                ref={railRef}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                onContentSizeChange={() => railRef.current?.scrollToEnd({ animated: false })}
-              >
                 <View>
-                  {/* Encabezado de fechas — la última es "la de ahora"; tocar
-                      una abre esa medición para editarla. El ancho vive en el
-                      View (mismo estilo que las celdas de valores: header y
-                      columnas no pueden divergir); el Pressable solo rellena. */}
-                  <View style={[styles.valuesRow, styles.headerRow, { height: ROW_H }]}>
-                    {table.cols.map((c, i) => (
-                      <View
-                        key={`${c.day}-${c.source}`}
-                        style={[
-                          styles.cell,
-                          i === lastIdx && styles.cellNow,
-                          i === lastIdx && styles.cellNowCap,
-                          { height: ROW_H },
-                        ]}
-                      >
-                        <Pressable
-                          onPress={() => openCheckin(c)}
-                          hitSlop={{ top: 4, bottom: 4 }}
-                          accessibilityRole="button"
-                          accessibilityLabel={`Editar la medición del ${c.day}`}
-                          style={({ pressed }) => [styles.headPress, pressed && { opacity: 0.6 }]}
-                        >
-                          <Text style={[styles.headText, i === lastIdx && styles.headTextNow]}>
-                            {fmtColDay(c.day)}
-                          </Text>
-                          <Text style={[styles.headYear, i === lastIdx && styles.headTextNow]}>
-                            {fmtColYear(c.day)}
-                          </Text>
-                        </Pressable>
-                      </View>
-                    ))}
-                    <View style={[styles.sparkCell, { height: ROW_H }]} />
-                  </View>
-
+                  <View style={[styles.cornerCell, { height: ROW_H }]} />
                   {table.groups.map((g) => (
                     <View key={g.title}>
-                      {/* El respiro de grupo repite las FECHAS atenuadas (a
-                          media tabla ya no sabías qué columna era cuál) y
-                          mantiene la banda dorada CONTINUA. Sin Pressable:
-                          solo el header real edita. */}
-                      <View style={[styles.valuesRow, { height: GROUP_H }]}>
-                        {table.cols.map((c, i) => (
+                      <View style={[styles.groupCell, { height: GROUP_H }]}>
+                        {/* Cada grupo con su ícono y su color (como Salud). */}
+                        <View style={styles.groupHead}>
+                          <GroupIcon title={g.title} />
+                          <Text style={[styles.groupText, { color: groupColor(g.title) }]}>
+                            {g.title}
+                          </Text>
+                        </View>
+                      </View>
+                      {g.rows.map((r, ri) => {
+                        // Jerarquía de ESTRUCTURA (no de valor): en Músculo y
+                        // Grasa la fila Total es la que se escanea; los
+                        // segmentos bajan un tono.
+                        const segment =
+                          (g.title === 'Músculo' || g.title === 'Grasa') && r.label !== 'Total'
+                        return (
                           <View
-                            key={`ghost-${g.title}-${c.day}-${c.source}`}
+                            key={r.key}
                             style={[
-                              styles.cell,
-                              styles.ghostCell,
-                              i === lastIdx && styles.cellNow,
-                              { height: GROUP_H },
+                              styles.labelCell,
+                              { height: ROW_H },
+                              ri % 2 === 1 && styles.zebra,
                             ]}
                           >
-                            <Text style={styles.ghostDate}>{fmtColDay(c.day)}</Text>
-                          </View>
-                        ))}
-                        <View style={[styles.sparkCell, { height: GROUP_H }]} />
-                      </View>
-                      {g.rows.map((r, ri) => (
-                        <View
-                          key={r.key}
-                          style={[
-                            styles.valuesRow,
-                            { height: ROW_H },
-                            ri % 2 === 1 && styles.zebra,
-                          ]}
-                          accessible
-                          accessibilityLabel={`${r.label}: ${r.values.map((v) => fmtCell(v)).join(', ')}${r.unit ? ` ${r.unit}` : ''}`}
-                        >
-                          {r.values.map((v, i) => (
-                            <View
-                              key={`${r.key}-${table.cols[i]?.day}-${table.cols[i]?.source}`}
-                              style={[
-                                styles.cell,
-                                i === lastIdx && styles.cellNow,
-                                { height: ROW_H },
-                              ]}
+                            <Text
+                              style={[styles.labelText, segment && styles.labelTextSegment]}
+                              numberOfLines={1}
                             >
-                              {/* Un hueco no debe brillar como un dato. */}
-                              <Text
-                                style={[
-                                  styles.cellText,
-                                  i === lastIdx && styles.cellTextNow,
-                                  v == null && styles.cellEmpty,
-                                ]}
-                              >
-                                {fmtCell(v)}
-                              </Text>
-                            </View>
-                          ))}
-                          {/* La mejora vs el Excel: la línea es historia, el
-                              nodo encendido es hoy (rima con la columna oro). */}
-                          <View style={[styles.sparkCell, { height: ROW_H }]}>
-                            {r.spark.length >= 2 ? (
-                              <Sparkline
-                                data={r.spark}
-                                hue={colors.oroSoft}
-                                width={44}
-                                height={14}
-                                style={{ marginTop: 0 }}
-                                endNode
-                              />
-                            ) : null}
+                              {r.label}
+                              {r.unit ? <Text style={styles.labelUnit}> {r.unit}</Text> : null}
+                            </Text>
                           </View>
-                        </View>
-                      ))}
+                        )
+                      })}
                     </View>
                   ))}
                 </View>
-              </ScrollView>
-            </View>
+
+                {/* Columnas de fechas (scroll horizontal) + tendencia al final.
+                  Arranca al FINAL: "la de ahora" es lo primero que buscas; el
+                  peek parcial queda del lado del pasado. */}
+                <ScrollView
+                  ref={railRef}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  onContentSizeChange={() => railRef.current?.scrollToEnd({ animated: false })}
+                >
+                  <View>
+                    {/* Encabezado de fechas — la última es "la de ahora"; tocar
+                      una abre esa medición para editarla. El ancho vive en el
+                      View (mismo estilo que las celdas de valores: header y
+                      columnas no pueden divergir); el Pressable solo rellena. */}
+                    <View style={[styles.valuesRow, styles.headerRow, { height: ROW_H }]}>
+                      {table.cols.map((c, i) => (
+                        <View
+                          key={`${c.day}-${c.source}`}
+                          style={[
+                            styles.cell,
+                            i === lastIdx && styles.cellNow,
+                            i === lastIdx && styles.cellNowCap,
+                            { height: ROW_H },
+                          ]}
+                        >
+                          <Pressable
+                            onPress={() => openCheckin(c)}
+                            hitSlop={{ top: 4, bottom: 4 }}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Editar la medición del ${c.day}`}
+                            style={({ pressed }) => [styles.headPress, pressed && { opacity: 0.6 }]}
+                          >
+                            <Text style={[styles.headText, i === lastIdx && styles.headTextNow]}>
+                              {fmtColDay(c.day)}
+                            </Text>
+                            <Text style={[styles.headYear, i === lastIdx && styles.headTextNow]}>
+                              {fmtColYear(c.day)}
+                            </Text>
+                          </Pressable>
+                        </View>
+                      ))}
+                      <View style={[styles.sparkCell, { height: ROW_H }]} />
+                    </View>
+
+                    {table.groups.map((g) => (
+                      <View key={g.title}>
+                        {/* El respiro de grupo repite las FECHAS atenuadas (a
+                          media tabla ya no sabías qué columna era cuál) y
+                          mantiene la banda dorada CONTINUA. Sin Pressable:
+                          solo el header real edita. */}
+                        <View style={[styles.valuesRow, { height: GROUP_H }]}>
+                          {table.cols.map((c, i) => (
+                            <View
+                              key={`ghost-${g.title}-${c.day}-${c.source}`}
+                              style={[
+                                styles.cell,
+                                styles.ghostCell,
+                                i === lastIdx && styles.cellNow,
+                                { height: GROUP_H },
+                              ]}
+                            >
+                              <Text style={styles.ghostDate}>{fmtColDay(c.day)}</Text>
+                            </View>
+                          ))}
+                          <View style={[styles.sparkCell, { height: GROUP_H }]} />
+                        </View>
+                        {g.rows.map((r, ri) => (
+                          <View
+                            key={r.key}
+                            style={[
+                              styles.valuesRow,
+                              { height: ROW_H },
+                              ri % 2 === 1 && styles.zebra,
+                            ]}
+                            accessible
+                            accessibilityLabel={`${r.label}: ${r.values.map((v) => fmtCell(v)).join(', ')}${r.unit ? ` ${r.unit}` : ''}`}
+                          >
+                            {r.values.map((v, i) => (
+                              <View
+                                key={`${r.key}-${table.cols[i]?.day}-${table.cols[i]?.source}`}
+                                style={[
+                                  styles.cell,
+                                  i === lastIdx && styles.cellNow,
+                                  { height: ROW_H },
+                                ]}
+                              >
+                                {/* Un hueco no debe brillar como un dato. */}
+                                <Text
+                                  style={[
+                                    styles.cellText,
+                                    i === lastIdx && styles.cellTextNow,
+                                    v == null && styles.cellEmpty,
+                                  ]}
+                                >
+                                  {fmtCell(v)}
+                                </Text>
+                              </View>
+                            ))}
+                            {/* La mejora vs el Excel: la línea es historia, el
+                              nodo encendido es hoy (rima con la columna oro). */}
+                            <View style={[styles.sparkCell, { height: ROW_H }]}>
+                              {r.spark.length >= 2 ? (
+                                <Sparkline
+                                  data={r.spark}
+                                  hue={colors.oroSoft}
+                                  width={44}
+                                  height={14}
+                                  style={{ marginTop: 0 }}
+                                  endNode
+                                />
+                              ) : null}
+                            </View>
+                          </View>
+                        ))}
+                      </View>
+                    ))}
+                  </View>
+                </ScrollView>
+              </Animated.View>
+            )}
+
+            {/* La tabla trae mediciones completas; los pesajes del día a día
+                (app y báscula) viven en Peso. */}
+            <Animated.View entering={FadeIn.duration(320).delay(120)}>
+              <Pressable
+                onPress={() => router.push('/weight-trend')}
+                accessibilityRole="button"
+                style={({ pressed }) => pressed && { opacity: 0.7 }}
+              >
+                <View style={styles.weighRow}>
+                  <ScaleGlyph color={colors.magenta} />
+                  <Text style={styles.weighText}>Todos tus pesajes (app y báscula)</Text>
+                  <Text style={styles.weighChevron}>›</Text>
+                </View>
+              </Pressable>
+            </Animated.View>
 
             {/* Quirk-safe (View con layout + Pressable adentro): el label es
                 "Nueva medición", consistente con el CTA del tab (una puerta). */}
@@ -338,7 +396,7 @@ export default function ProgressTableScreen() {
                 quedarse. PDF con el layout de la tabla del coach (pedido
                 dueña) + CSV para hojas de cálculo. */}
             <Text style={styles.exportCaption}>
-              {exporting ? 'Preparando tu archivo…' : 'Esta tabla es tuya'}
+              {exporting ? 'Preparando tu archivo…' : 'Tus datos son tuyos'}
             </Text>
             {/* Entrada Y salida bajo el mismo techo: la tabla del coach
                 entra por foto/PDF (scan-measurements) y sale por PDF/CSV. */}
@@ -370,6 +428,19 @@ export default function ProgressTableScreen() {
   )
 }
 
+function groupColor(title: string): string {
+  if (title === 'Músculo') return colors.dimension.cuerpo
+  if (title === 'Grasa') return colors.signal.grasa
+  return colors.magenta
+}
+
+function GroupIcon({ title }: { title: string }) {
+  const color = groupColor(title)
+  if (title === 'Músculo') return <DumbbellGlyph size={14} color={color} />
+  if (title === 'Grasa') return <FatGlyph size={14} color={color} />
+  return <ScaleGlyph size={14} color={color} />
+}
+
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   safe: { flex: 1 },
@@ -377,24 +448,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
+    gap: 12,
     paddingHorizontal: 20,
     paddingTop: 10,
     paddingBottom: 10,
   },
+  headerText: { flex: 1 },
   title: {
-    fontFamily: typography.displayHeavy,
-    fontSize: typography.sizes.headingLg,
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.displaySm,
     color: colors.leche,
-    letterSpacing: -0.5,
   },
   // Cormorant a cuerpo chico se pierde en niebla: un tono arriba (bone) y
   // un punto más (dueña: "las cursivas casi no se ven").
   sub: {
-    marginTop: 2,
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.bodyLarge,
-    color: colors.bone,
+    marginTop: 4,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    color: colors.niebla,
   },
   empty: {
     marginTop: 30,
@@ -404,15 +475,59 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   content: { paddingHorizontal: 16, paddingBottom: 40 },
-  tableRow: { flexDirection: 'row' },
+  segments: {
+    flexDirection: 'row',
+    padding: 3,
+    gap: 2,
+    marginBottom: 12,
+    borderRadius: 10,
+    backgroundColor: colors.bgCard,
+  },
+  segment: { flex: 1, height: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  segmentOn: { backgroundColor: colors.magentaTint2 },
+  segmentText: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.body,
+    color: colors.bone,
+  },
+  segmentTextOn: { fontFamily: typography.uiBold, color: colors.leche },
+  tableRow: {
+    flexDirection: 'row',
+    borderRadius: 20,
+    backgroundColor: colors.bgCard,
+    paddingHorizontal: 8,
+    paddingBottom: 8,
+    overflow: 'hidden',
+  },
+  groupHead: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  weighRow: {
+    marginTop: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderRadius: 16,
+    backgroundColor: colors.bgCard,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  weighText: {
+    flex: 1,
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.body,
+    color: colors.leche,
+  },
+  weighChevron: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.niebla,
+  },
   cornerCell: { width: LABEL_W },
   groupCell: { width: LABEL_W, justifyContent: 'flex-end', paddingBottom: 6 },
   groupText: {
     fontFamily: typography.uiBold,
     fontSize: typography.sizes.smallLabel,
-    letterSpacing: 1.6,
+    letterSpacing: 1.2,
     textTransform: 'uppercase',
-    color: colors.oroSoft,
   },
   labelCell: {
     width: LABEL_W,
@@ -490,13 +605,11 @@ const styles = StyleSheet.create({
   addBtnWrap: { marginTop: 22, alignSelf: 'center' },
   // El único elemento del pie con SUPERFICIE: gana sin gritar.
   addBtn: {
-    backgroundColor: colors.bgCard2,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
+    backgroundColor: colors.magentaTint2,
     borderRadius: 14,
-    paddingHorizontal: 18,
+    paddingHorizontal: 22,
     paddingVertical: 12,
-    minHeight: 44,
+    minHeight: 48,
     justifyContent: 'center',
   },
   addBtnText: {
@@ -530,10 +643,9 @@ const styles = StyleSheet.create({
   // Discreto y centrado: no compite con el botón de captura (uxui).
   disclaimer: {
     marginTop: 14,
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
+    fontFamily: typography.uiMedium,
     fontSize: typography.sizes.label,
-    color: colors.bone,
+    color: colors.niebla,
     textAlign: 'center',
   },
 })
