@@ -268,7 +268,7 @@ export function weighInsForTrend(n: number): number {
 }
 
 /** Tres marcas de kilos redondos que cubren los puntos (eje de la gráfica). */
-export function weightAxisTicks(points: readonly WeightPoint[]): [number, number, number] {
+export function weightAxisTicks(points: readonly { weight: number }[]): [number, number, number] {
   if (points.length === 0) return [0, 1, 2]
   const ws = points.map((p) => p.weight)
   const lo = Math.floor(Math.min(...ws) - 0.3)
@@ -643,7 +643,38 @@ export function mergeComposition(
 }
 
 /** Punto de una serie de composición: día + valor. */
-export type SeriesPoint = { day: string; value: number }
+export type SeriesPoint = {
+  day: string
+  value: number
+  /** De dónde vino: una medición (check-in) o Salud (wearable). */
+  source?: 'checkin' | 'wearable'
+}
+
+export const SERIES_SOURCE_LABEL: Record<'checkin' | 'wearable', string> = {
+  checkin: 'Medición',
+  wearable: 'Salud',
+}
+
+/**
+ * Cambio de una métrica de composición sin mezclar fuentes (dueña 7 oct 2026:
+ * restar un InBody contra una báscula de Salud no es un cambio real). Toma la
+ * fuente de la última medición y compara su primer y último punto. null con
+ * menos de 2 puntos de esa fuente.
+ */
+export function sameSourceChange(
+  points: readonly SeriesPoint[],
+): { abs: number; fromDay: string; n: number } | null {
+  const last = points[points.length - 1]
+  if (!last) return null
+  const same = points.filter((p) => p.source === last.source)
+  if (same.length < 2) return null
+  const first = same[0]!
+  return {
+    abs: Math.round((last.value - first.value) * 10) / 10,
+    fromDay: first.day,
+    n: same.length,
+  }
+}
 
 export type CompositionSeriesKey = 'body_fat_pct' | 'muscle_kg' | 'water_pct' | 'bmi' | 'lean_kg'
 
@@ -657,7 +688,7 @@ export function compositionSeries(
   checkins: readonly BodyCheckin[],
   wearable: readonly BodyComposition[],
 ): Record<CompositionSeriesKey, SeriesPoint[]> {
-  const out: Record<CompositionSeriesKey, Map<string, number>> = {
+  const out: Record<CompositionSeriesKey, Map<string, SeriesPoint>> = {
     body_fat_pct: new Map(),
     muscle_kg: new Map(),
     water_pct: new Map(),
@@ -665,21 +696,21 @@ export function compositionSeries(
     lean_kg: new Map(),
   }
   for (const w of wearable) {
-    if (w.body_fat_pct != null) out.body_fat_pct.set(w.day_date, w.body_fat_pct)
-    if (w.lean_body_mass_kg != null) out.lean_kg.set(w.day_date, w.lean_body_mass_kg)
-    if (w.bmi != null) out.bmi.set(w.day_date, w.bmi)
+    const at = (value: number): SeriesPoint => ({ day: w.day_date, value, source: 'wearable' })
+    if (w.body_fat_pct != null) out.body_fat_pct.set(w.day_date, at(w.body_fat_pct))
+    if (w.lean_body_mass_kg != null) out.lean_kg.set(w.day_date, at(w.lean_body_mass_kg))
+    if (w.bmi != null) out.bmi.set(w.day_date, at(w.bmi))
   }
   for (const c of checkins) {
     // El check-in GANA el día (medición deliberada).
-    if (c.body_fat_pct != null) out.body_fat_pct.set(c.measured_on, c.body_fat_pct)
-    if (c.muscle_kg != null) out.muscle_kg.set(c.measured_on, c.muscle_kg)
-    if (c.water_pct != null) out.water_pct.set(c.measured_on, c.water_pct)
-    if (c.bmi != null) out.bmi.set(c.measured_on, c.bmi)
+    const at = (value: number): SeriesPoint => ({ day: c.measured_on, value, source: 'checkin' })
+    if (c.body_fat_pct != null) out.body_fat_pct.set(c.measured_on, at(c.body_fat_pct))
+    if (c.muscle_kg != null) out.muscle_kg.set(c.measured_on, at(c.muscle_kg))
+    if (c.water_pct != null) out.water_pct.set(c.measured_on, at(c.water_pct))
+    if (c.bmi != null) out.bmi.set(c.measured_on, at(c.bmi))
   }
-  const toSeries = (m: Map<string, number>): SeriesPoint[] =>
-    [...m.entries()]
-      .map(([day, value]) => ({ day, value }))
-      .sort((a, b) => (a.day < b.day ? -1 : 1))
+  const toSeries = (m: Map<string, SeriesPoint>): SeriesPoint[] =>
+    [...m.values()].sort((a, b) => (a.day < b.day ? -1 : 1))
   return {
     body_fat_pct: toSeries(out.body_fat_pct),
     muscle_kg: toSeries(out.muscle_kg),
@@ -895,7 +926,7 @@ export function checkinSeries(
 ): SeriesPoint[] {
   return checkins
     .filter((c) => typeof c[key] === 'number')
-    .map((c) => ({ day: c.measured_on, value: c[key] as number }))
+    .map((c) => ({ day: c.measured_on, value: c[key] as number, source: 'checkin' as const }))
     .sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : 0))
 }
 

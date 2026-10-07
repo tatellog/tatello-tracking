@@ -193,8 +193,8 @@ describe('checkinSeries — serie genérica de una métrica (Epic 08)', () => {
       'visceral_fat_index',
     )
     expect(s).toEqual([
-      { day: '2024-08-15', value: 4.5 },
-      { day: '2025-08-15', value: 5 },
+      { day: '2024-08-15', value: 4.5, source: 'checkin' },
+      { day: '2025-08-15', value: 5, source: 'checkin' },
     ])
   })
 

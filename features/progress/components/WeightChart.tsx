@@ -13,7 +13,11 @@ import Svg, { Circle, Line, Text as SvgText } from 'react-native-svg'
 
 import { colors, typography } from '@/theme'
 
-import { WEIGHT_SOURCE_LABEL, weightAxisTicks, type WeightPoint } from '../logic'
+import { WEIGHT_SOURCE_LABEL, weightAxisTicks, type WeightSource } from '../logic'
+
+/** Un punto de la gráfica: peso o cualquier métrica (la clave se llama
+ *  `weight` por historia; es el valor). */
+export type ChartPoint = { t: number; weight: number; source?: string }
 
 /*
  * La gráfica de peso al estilo Salud (dueña 7 oct 2026): tus mediciones como
@@ -30,12 +34,23 @@ const PLOT_BOTTOM = 160
 const AXIS_W = 30
 const MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
 
-export function fmtShortDay(t: number): string {
+export function fmtShortDay(t: number, withYear = false): string {
   const d = new Date(t)
-  return `${d.getDate()} ${MONTHS[d.getMonth()]}`
+  return `${d.getDate()} ${MONTHS[d.getMonth()]}${withYear ? ` ${String(d.getFullYear()).slice(2)}` : ''}`
 }
 
-export function WeightChart({ points }: { points: readonly WeightPoint[] }) {
+export function WeightChart({
+  points,
+  unit = 'kg',
+  color = colors.magenta,
+  sourceLabel = (s: string) => WEIGHT_SOURCE_LABEL[s as WeightSource] ?? s,
+}: {
+  points: readonly ChartPoint[]
+  unit?: string
+  /** El color de la categoría (magenta para peso; el de cada métrica). */
+  color?: string
+  sourceLabel?: (source: string) => string
+}) {
   const [width, setWidth] = useState(0)
   const [picked, setPicked] = useState<number | null>(null)
   const reduce = useReducedMotion()
@@ -61,6 +76,8 @@ export function WeightChart({ points }: { points: readonly WeightPoint[] }) {
   const t0 = points[0]?.t ?? 0
   const t1 = points[points.length - 1]?.t ?? 1
   const span = Math.max(1, t1 - t0)
+  // Si el rango cruza años, las fechas llevan el año ("15 ago 24" vs "15 ago 25").
+  const yr = new Date(t0).getFullYear() !== new Date(t1).getFullYear()
   const x = (t: number) => (points.length === 1 ? plotW / 2 : 6 + ((t - t0) / span) * (plotW - 12))
   const y = (w: number) =>
     PLOT_BOTTOM - ((w - ticks[0]) / (ticks[2] - ticks[0])) * (PLOT_BOTTOM - PLOT_TOP)
@@ -82,15 +99,19 @@ export function WeightChart({ points }: { points: readonly WeightPoint[] }) {
     setPicked(best)
   }
 
-  const mid = points.length > 2 ? points[Math.floor(points.length / 2)] : null
+  const midCand = points.length > 2 ? points[Math.floor(points.length / 2)] : null
+  // La fecha de en medio solo si no se encima con la primera ni la última.
+  const mid = midCand && x(midCand.t) > 80 && x(midCand.t) < plotW - 80 ? midCand : null
 
   return (
     <View onLayout={(e: LayoutChangeEvent) => setWidth(e.nativeEvent.layout.width)}>
       {selPoint ? (
         <Text style={styles.readout} accessibilityLiveRegion="polite">
-          <Text style={styles.readoutValue}>{selPoint.weight.toFixed(1)} kg</Text>
-          {`  ${fmtShortDay(selPoint.t)}`}
-          {selPoint.source ? ` · ${WEIGHT_SOURCE_LABEL[selPoint.source]}` : ''}
+          <Text
+            style={styles.readoutValue}
+          >{`${selPoint.weight.toFixed(1)}${unit ? ` ${unit}` : ''}`}</Text>
+          {`  ${fmtShortDay(selPoint.t, yr)}`}
+          {selPoint.source ? ` · ${sourceLabel(selPoint.source)}` : ''}
         </Text>
       ) : null}
       {width > 0 ? (
@@ -147,7 +168,7 @@ export function WeightChart({ points }: { points: readonly WeightPoint[] }) {
                 cx={x(selPoint.t)}
                 cy={y(selPoint.weight)}
                 r={12}
-                fill={colors.magenta}
+                fill={color}
                 opacity={0.22}
               />
             ) : null}
@@ -159,6 +180,7 @@ export function WeightChart({ points }: { points: readonly WeightPoint[] }) {
                 index={i}
                 reveal={reveal}
                 selected={i === sel}
+                color={color}
               />
             ))}
             <SvgText
@@ -168,7 +190,7 @@ export function WeightChart({ points }: { points: readonly WeightPoint[] }) {
               fontSize={11}
               fontFamily={typography.uiMedium}
             >
-              {points[0] ? fmtShortDay(points[0].t) : ''}
+              {points[0] ? fmtShortDay(points[0].t, yr) : ''}
             </SvgText>
             {mid ? (
               <SvgText
@@ -179,7 +201,7 @@ export function WeightChart({ points }: { points: readonly WeightPoint[] }) {
                 fontFamily={typography.uiMedium}
                 textAnchor="middle"
               >
-                {fmtShortDay(mid.t)}
+                {fmtShortDay(mid.t, yr)}
               </SvgText>
             ) : null}
             {points.length > 1 ? (
@@ -191,7 +213,7 @@ export function WeightChart({ points }: { points: readonly WeightPoint[] }) {
                 fontFamily={typography.uiMedium}
                 textAnchor="end"
               >
-                {fmtShortDay(t1)}
+                {fmtShortDay(t1, yr)}
               </SvgText>
             ) : null}
           </Svg>
@@ -209,24 +231,21 @@ function Dot({
   index,
   reveal,
   selected,
+  color,
 }: {
   cx: number
   cy: number
   index: number
   reveal: SharedValue<number>
   selected: boolean
+  color: string
 }) {
   const props = useAnimatedProps(() => {
     const on = Math.max(0, Math.min(1, reveal.value - index))
     return { opacity: on, r: (selected ? 5.5 : 4) * (0.4 + 0.6 * on) }
   })
   return (
-    <AnimatedCircle
-      cx={cx}
-      cy={cy}
-      fill={selected ? colors.leche : colors.magenta}
-      animatedProps={props}
-    />
+    <AnimatedCircle cx={cx} cy={cy} fill={selected ? colors.leche : color} animatedProps={props} />
   )
 }
 

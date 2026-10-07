@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router'
 import { useMemo, useRef, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import Animated, { FadeIn } from 'react-native-reanimated'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import Svg, { Path } from 'react-native-svg'
 
@@ -11,6 +12,7 @@ import { useBodyCheckins } from '@/features/progress/hooks'
 import { checkinTable } from '@/features/progress/logic'
 import { AiImportPill } from '@/features/progress/components/AiImportPill'
 import { LinkCta } from '@/features/progress/components/LinkCta'
+import { DumbbellGlyph, FatGlyph, ScaleGlyph } from '@/features/progress/components/HealthGlyphs'
 import { Sparkline } from '@/features/progress/components/Sparkline'
 import { SkyBackground } from '@/features/tabs/components'
 import { colors, typography } from '@/theme'
@@ -92,9 +94,11 @@ export default function ProgressTableScreen() {
       <SkyBackground />
       <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
         <View style={styles.header}>
-          <View>
-            <Text style={styles.title}>Tabla completa</Text>
-            <Text style={styles.sub}>Tus mediciones, tal cual · toca una fecha para editarla</Text>
+          <View style={styles.headerText}>
+            <Text style={styles.title}>Mediciones</Text>
+            <Text style={styles.sub}>
+              Tus mediciones completas, tal cual. Toca una fecha para editarla.
+            </Text>
           </View>
           <Pressable
             onPress={() => router.back()}
@@ -160,7 +164,7 @@ export default function ProgressTableScreen() {
           </View>
         ) : (
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
-            <View style={styles.tableRow}>
+            <Animated.View entering={FadeIn.duration(360)} style={styles.tableRow}>
               {/* Columna FIJA de métricas (si las fechas scrollean, los nombres
                   se quedan — "si 'Peso' desaparece me pierdo en dos segundos"). */}
               <View>
@@ -168,7 +172,13 @@ export default function ProgressTableScreen() {
                 {table.groups.map((g) => (
                   <View key={g.title}>
                     <View style={[styles.groupCell, { height: GROUP_H }]}>
-                      <Text style={styles.groupText}>{g.title}</Text>
+                      {/* Cada grupo con su ícono y su color (como Salud). */}
+                      <View style={styles.groupHead}>
+                        <GroupIcon title={g.title} />
+                        <Text style={[styles.groupText, { color: groupColor(g.title) }]}>
+                          {g.title}
+                        </Text>
+                      </View>
                     </View>
                     {g.rows.map((r, ri) => {
                       // Jerarquía de ESTRUCTURA (no de valor): en Músculo y
@@ -317,7 +327,23 @@ export default function ProgressTableScreen() {
                   ))}
                 </View>
               </ScrollView>
-            </View>
+            </Animated.View>
+
+            {/* La tabla trae mediciones completas; los pesajes del día a día
+                (app y báscula) viven en Peso. */}
+            <Animated.View entering={FadeIn.duration(320).delay(120)}>
+              <Pressable
+                onPress={() => router.push('/weight-trend')}
+                accessibilityRole="button"
+                style={({ pressed }) => pressed && { opacity: 0.7 }}
+              >
+                <View style={styles.weighRow}>
+                  <ScaleGlyph color={colors.magenta} />
+                  <Text style={styles.weighText}>Todos tus pesajes (app y báscula)</Text>
+                  <Text style={styles.weighChevron}>›</Text>
+                </View>
+              </Pressable>
+            </Animated.View>
 
             {/* Quirk-safe (View con layout + Pressable adentro): el label es
                 "Nueva medición", consistente con el CTA del tab (una puerta). */}
@@ -370,6 +396,19 @@ export default function ProgressTableScreen() {
   )
 }
 
+function groupColor(title: string): string {
+  if (title === 'Músculo') return colors.dimension.cuerpo
+  if (title === 'Grasa') return colors.signal.grasa
+  return colors.magenta
+}
+
+function GroupIcon({ title }: { title: string }) {
+  const color = groupColor(title)
+  if (title === 'Músculo') return <DumbbellGlyph size={14} color={color} />
+  if (title === 'Grasa') return <FatGlyph size={14} color={color} />
+  return <ScaleGlyph size={14} color={color} />
+}
+
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   safe: { flex: 1 },
@@ -377,24 +416,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
+    gap: 12,
     paddingHorizontal: 20,
     paddingTop: 10,
     paddingBottom: 10,
   },
+  headerText: { flex: 1 },
   title: {
-    fontFamily: typography.displayHeavy,
-    fontSize: typography.sizes.headingLg,
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.displaySm,
     color: colors.leche,
-    letterSpacing: -0.5,
   },
   // Cormorant a cuerpo chico se pierde en niebla: un tono arriba (bone) y
   // un punto más (dueña: "las cursivas casi no se ven").
   sub: {
-    marginTop: 2,
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.bodyLarge,
-    color: colors.bone,
+    marginTop: 4,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    color: colors.niebla,
   },
   empty: {
     marginTop: 30,
@@ -404,15 +443,43 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   content: { paddingHorizontal: 16, paddingBottom: 40 },
-  tableRow: { flexDirection: 'row' },
+  tableRow: {
+    flexDirection: 'row',
+    borderRadius: 20,
+    backgroundColor: colors.bgCard,
+    paddingHorizontal: 8,
+    paddingBottom: 8,
+    overflow: 'hidden',
+  },
+  groupHead: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  weighRow: {
+    marginTop: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderRadius: 16,
+    backgroundColor: colors.bgCard,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  weighText: {
+    flex: 1,
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.body,
+    color: colors.leche,
+  },
+  weighChevron: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.niebla,
+  },
   cornerCell: { width: LABEL_W },
   groupCell: { width: LABEL_W, justifyContent: 'flex-end', paddingBottom: 6 },
   groupText: {
     fontFamily: typography.uiBold,
     fontSize: typography.sizes.smallLabel,
-    letterSpacing: 1.6,
+    letterSpacing: 1.2,
     textTransform: 'uppercase',
-    color: colors.oroSoft,
   },
   labelCell: {
     width: LABEL_W,
@@ -490,13 +557,11 @@ const styles = StyleSheet.create({
   addBtnWrap: { marginTop: 22, alignSelf: 'center' },
   // El único elemento del pie con SUPERFICIE: gana sin gritar.
   addBtn: {
-    backgroundColor: colors.bgCard2,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
+    backgroundColor: colors.magentaTint2,
     borderRadius: 14,
-    paddingHorizontal: 18,
+    paddingHorizontal: 22,
     paddingVertical: 12,
-    minHeight: 44,
+    minHeight: 48,
     justifyContent: 'center',
   },
   addBtnText: {

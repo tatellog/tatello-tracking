@@ -63,3 +63,23 @@ test('compareDeltas: solo métricas con dato en ambos lados; grasa en puntos', (
     { key: 'bmi', label: 'IMC', text: '↑ 1.9' },
   ])
 })
+
+describe('sameSourceChange · no resta entre fuentes', () => {
+  const { sameSourceChange } = jest.requireActual('../logic') as typeof import('../logic')
+  test('compara solo los puntos de la fuente de la última medición', () => {
+    const c = sameSourceChange([
+      { day: '2024-08-15', value: 35.4, source: 'checkin' },
+      { day: '2025-01-10', value: 28, source: 'wearable' },
+      { day: '2025-08-15', value: 36.8, source: 'checkin' },
+    ])
+    expect(c).toEqual({ abs: 1.4, fromDay: '2024-08-15', n: 2 })
+  })
+  test('con un solo punto de esa fuente, no hay cambio', () => {
+    expect(
+      sameSourceChange([
+        { day: '2024-08-15', value: 35, source: 'checkin' },
+        { day: '2025-08-15', value: 30, source: 'wearable' },
+      ]),
+    ).toBeNull()
+  })
+})

@@ -269,11 +269,11 @@ export function DumbbellGlyph({ size = 16, color }: { size?: number; color: stri
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <AnimatedG animatedProps={g}>
-        <Path d="M7 12h10" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
+        <Path d="M7 12h10" stroke={color} strokeWidth={2.2} strokeLinecap="round" />
         <Path
-          d="M5 8v8M8 7v10M16 7v10M19 8v8"
+          d="M4 9.5v5M7.5 7v10M16.5 7v10M20 9.5v5"
           stroke={color}
-          strokeWidth={1.8}
+          strokeWidth={2.4}
           strokeLinecap="round"
         />
       </AnimatedG>
