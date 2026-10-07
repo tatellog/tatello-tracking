@@ -30,6 +30,7 @@ const comp = (day: string, o: Partial<BodyComposition> = {}): BodyComposition =>
 
 const photo = (day: string, angle: TimelinePhoto['angle'], id = day): TimelinePhoto => ({
   id: `${id}-${angle}`,
+  storage_path: `u/${id}-${angle}.jpg`,
   taken_at: `${day}T12:00:00Z`,
   angle,
   signed_url: `https://x/${id}`,
@@ -136,6 +137,7 @@ describe('mergeWeightSeries — UNA sola verdad de peso (app + coach)', () => {
 describe('photoNear — tolerancia ±3 días para el cambio visual', () => {
   const p = (day: string): TimelinePhoto => ({
     id: day,
+    storage_path: `u/${day}.jpg`,
     taken_at: `${day}T12:00:00Z`,
     angle: 'front',
     signed_url: `https://x/${day}`,

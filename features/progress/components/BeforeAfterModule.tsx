@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics'
 import { useEffect, useMemo, useState } from 'react'
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native'
+import { Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeIn } from 'react-native-reanimated'
 
 import { track } from '@/lib/analytics'
@@ -8,7 +8,7 @@ import { colors, typography } from '@/theme'
 
 import type { PhotoAngle } from '../api'
 import { PROGRESS_EVENTS } from '../constants'
-import { useBodyCheckins, usePhotoTimeline } from '../hooks'
+import { useBodyCheckins, useDeletePhoto, usePhotoTimeline } from '../hooks'
 import {
   buildCompareEntries,
   compareDeltas,
@@ -19,6 +19,8 @@ import {
   type WeightPoint,
 } from '../logic'
 import { HealthCardHeader } from './HealthCardHeader'
+import { ProgressShareSheet } from './ProgressShareSheet'
+import { useTransformationShareTabs } from './useTransformationShare'
 import {
   DropGlyph,
   DumbbellGlyph,
@@ -51,11 +53,13 @@ const LIST_PREVIEW = 5
 export function BeforeAfterModule({
   weights,
   onOpenTable,
+  onAddPhotos,
   preset,
 }: {
   /** La serie de peso fusionada (la misma de la tarjeta de Peso). */
   weights: readonly WeightPoint[]
   onOpenTable: () => void
+  onAddPhotos: () => void
   /** A/B elegidos desde fuera (al guardar una medición: anterior vs nueva). */
   preset?: { a: string; b: string; nonce: number } | null
 }) {
@@ -76,6 +80,8 @@ export function BeforeAfterModule({
   const [bDay, setBDay] = useState<string | null>(null)
   const [side, setSide] = useState<'A' | 'B'>('B')
   const [showAll, setShowAll] = useState(false)
+  const [shareOpen, setShareOpen] = useState(false)
+  const deletePhoto = useDeletePhoto()
   useEffect(() => {
     if (!preset) return
     setADay(preset.a)
@@ -83,16 +89,51 @@ export function BeforeAfterModule({
     setSide('B')
   }, [preset])
 
-  if (entries.length < 2) return null
-
   const find = (day: string | null) => (day ? entries.find((e) => e.day === day) : undefined)
-  const a = find(aDay) ?? entries[0]!
-  const b = find(bDay) ?? entries[entries.length - 1]!
+  const a = find(aDay) ?? entries[0]
+  const b = find(bDay) ?? entries[entries.length - 1]
+  // MI TRANSFORMACIÓN (se queda): el par A/B elegido, con el peso real de cada fecha.
+  const shareTabs = useTransformationShareTabs({
+    before: a?.photo ?? null,
+    after: b?.photo ?? null,
+    weightFrom: a?.weight ?? null,
+    weightTo: b?.weight ?? null,
+  })
+
+  if (entries.length < 2 || !a || !b) return null
   const deltas = compareDeltas(a, b)
   const elapsed = elapsedLabel(Math.abs(daysBetween(a.day, b.day)))
 
   const newestFirst = [...entries].reverse()
   const listed = showAll ? newestFirst : newestFirst.slice(0, LIST_PREVIEW)
+
+  // Borrar una foto: mantener presionada (como en Fotos), con confirmación.
+  const confirmDelete = (e: CompareEntry) => {
+    const photo = e.photo
+    if (!photo) return
+    Alert.alert(
+      'Eliminar esta foto',
+      `La foto del ${fmtDay(e.day)} se borra. No se puede recuperar.`,
+      [
+        { text: 'Conservar', style: 'cancel' },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: () =>
+            deletePhoto.mutate(
+              { id: photo.id, storagePath: photo.storage_path },
+              {
+                onError: (err) =>
+                  Alert.alert(
+                    'No se pudo eliminar',
+                    err instanceof Error ? err.message : 'Intenta de nuevo.',
+                  ),
+              },
+            ),
+        },
+      ],
+    )
+  }
 
   const pick = (e: CompareEntry) => {
     Haptics.selectionAsync().catch(() => {})
@@ -112,8 +153,20 @@ export function BeforeAfterModule({
         />
 
         <View style={styles.pair}>
-          <Side entry={a} label="A" active={side === 'A'} onPress={() => setSide('A')} />
-          <Side entry={b} label="B" active={side === 'B'} onPress={() => setSide('B')} />
+          <Side
+            entry={a}
+            label="A"
+            active={side === 'A'}
+            onPress={() => setSide('A')}
+            onLongPress={() => confirmDelete(a)}
+          />
+          <Side
+            entry={b}
+            label="B"
+            active={side === 'B'}
+            onPress={() => setSide('B')}
+            onLongPress={() => confirmDelete(b)}
+          />
         </View>
 
         {deltas.length > 0 ? (
@@ -164,16 +217,45 @@ export function BeforeAfterModule({
             })}
           </View>
         ) : null}
+        {shareTabs.length > 0 ? (
+          <Pressable
+            onPress={() => {
+              track(PROGRESS_EVENTS.photo, { kind: 'share-open' })
+              setShareOpen(true)
+            }}
+            accessibilityRole="button"
+            style={({ pressed }) => [styles.shareBtn, pressed && styles.pressed]}
+          >
+            <Text style={styles.shareText}>Compartir</Text>
+          </Pressable>
+        ) : null}
       </Animated.View>
+
+      {shareTabs.length > 0 ? (
+        <ProgressShareSheet
+          visible={shareOpen}
+          onClose={() => setShareOpen(false)}
+          subtitle="Tu cambio visual"
+          shareType="visual_change"
+          defaultTabId="transformacion"
+          tabs={shareTabs}
+          weightToggle={a.weight != null && b.weight != null}
+        />
+      ) : null}
 
       <View style={styles.listHead}>
         <View style={styles.deltaName}>
           <ListGlyph color={colors.bone} />
           <Text style={styles.listTitle}>Mediciones</Text>
         </View>
-        <Pressable onPress={onOpenTable} accessibilityRole="button" hitSlop={8}>
-          <Text style={styles.listLink}>Ver tabla ›</Text>
-        </Pressable>
+        <View style={styles.listLinks}>
+          <Pressable onPress={onAddPhotos} accessibilityRole="button" hitSlop={8}>
+            <Text style={styles.listLink}>Agregar fotos</Text>
+          </Pressable>
+          <Pressable onPress={onOpenTable} accessibilityRole="button" hitSlop={8}>
+            <Text style={styles.listLink}>Ver tabla ›</Text>
+          </Pressable>
+        </View>
       </View>
       <Text style={styles.caption}>{`Toca una para ponerla en el lado ${side}.`}</Text>
 
@@ -233,15 +315,19 @@ function Side({
   label,
   active,
   onPress,
+  onLongPress,
 }: {
   entry: CompareEntry
   label: 'A' | 'B'
   active: boolean
   onPress: () => void
+  onLongPress: () => void
 }) {
   return (
     <Pressable
       onPress={onPress}
+      onLongPress={entry.photo ? onLongPress : undefined}
+      accessibilityHint={entry.photo ? 'Mantén presionada para borrar la foto' : undefined}
       accessibilityRole="button"
       accessibilityState={{ selected: active }}
       accessibilityLabel={`Lado ${label}, ${fmtDay(entry.day)}`}
@@ -372,6 +458,15 @@ const styles = StyleSheet.create({
     color: colors.bone,
   },
   segmentTextOn: { fontFamily: typography.uiBold, color: colors.leche },
+  listLinks: { flexDirection: 'row', gap: 16 },
+  shareBtn: {
+    height: 44,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.magentaTint2,
+  },
+  shareText: { fontFamily: typography.uiBold, fontSize: typography.sizes.ui, color: colors.leche },
   listHead: {
     marginTop: 10,
     flexDirection: 'row',

@@ -12,7 +12,6 @@ import { useMacroTargets } from '@/features/macros/hooks'
 import { useSignalsHistory } from '@/features/orbit/hooks'
 import { daysInDeficit } from '@/features/orbit/month-built'
 import { useProfile } from '@/features/profile/hooks'
-import { BeforeAfterPhotos } from '@/features/progress/components/BeforeAfterPhotos'
 import { BeforeAfterModule } from '@/features/progress/components/BeforeAfterModule'
 import { consumeBodyCompare } from '@/features/progress/pending-compare'
 import { CompositionCards } from '@/features/progress/components/CompositionCards'
@@ -232,19 +231,13 @@ function ProgressBody() {
                   el ciclo vive en Hoy, y aquí solo como nota contextual bajo la
                   gráfica de peso de Cuerpo, donde explica la báscula.) */}
 
-              {/* "Tu cambio visual" — la evidencia emocional más fuerte: antes →
-              ahora en grande, con modo "Comparar" (slider de arrastrar).
-              Responde "¿realmente cambio?". */}
+              {/* Las fotos viven en Cuerpo › Antes y ahora (dueña 7 oct 2026:
+                  un solo comparador, con Compartir). */}
               <View style={styles.divider} />
-              <BeforeAfterPhotos />
-
-              {/* A · el antojo: Historia delega la evolución completa a Cuerpo
-                  (un solo hogar para la tira — nunca duplicarla aquí). */}
               <LinkCta
-                label="Ver tu evolución completa ›"
+                label="Ver tus fotos · Antes y ahora ›"
                 onPress={goBody}
-                accessibilityLabel="Ver tu evolución completa"
-                style={styles.bridgeLink}
+                accessibilityLabel="Ver tus fotos en Antes y ahora"
               />
 
               {/* Síntesis — resultado → causa → qué intentar. CIERRA Historia
@@ -372,6 +365,7 @@ function ProgressBody() {
                     <BeforeAfterModule
                       weights={allPoints}
                       onOpenTable={() => router.push('/progress-table')}
+                      onAddPhotos={() => router.push('/log-photos')}
                       preset={comparePreset}
                     />
                   </View>

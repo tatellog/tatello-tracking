@@ -26,6 +26,7 @@ import { processAndUploadFromUri } from '@/features/onboarding/photos/api'
 import type { PhotoAngle } from '@/features/onboarding/photos/hooks/usePhotosToday'
 import { PoseGlyph } from '@/features/progress/components/PoseGlyph'
 import { SkyBackground } from '@/features/tabs/components'
+import { showActionSheet } from '@/lib/actionSheet'
 import { queryKeys } from '@/lib/queryKeys'
 import { colors, typography } from '@/theme'
 
@@ -90,11 +91,33 @@ export default function LogPhotosScreen() {
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
   const [uploadingAngle, setUploadingAngle] = useState<PhotoAngle | null>(null)
 
-  const pick = async (angle: PhotoAngle) => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      quality: 0.9,
-    })
+  // Cámara o galería (dueña 7 oct 2026: antes solo abría la galería).
+  const pick = (angle: PhotoAngle) => {
+    showActionSheet(
+      {
+        title: 'Foto de progreso',
+        options: ['Tomar foto', 'Elegir de galería', 'Cancelar'],
+        cancelButtonIndex: 2,
+      },
+      (i) => {
+        if (i === 0) void pickFrom(angle, 'camera')
+        else if (i === 1) void pickFrom(angle, 'library')
+      },
+    )
+  }
+
+  const pickFrom = async (angle: PhotoAngle, source: 'camera' | 'library') => {
+    if (source === 'camera') {
+      const perm = await ImagePicker.requestCameraPermissionsAsync()
+      if (!perm.granted) {
+        Alert.alert('Cámara', 'Necesitamos permiso a la cámara para tomar la foto.')
+        return
+      }
+    }
+    const result =
+      source === 'camera'
+        ? await ImagePicker.launchCameraAsync({ quality: 0.9 })
+        : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.9 })
     const uri = result.assets?.[0]?.uri
     if (!result.canceled && uri) {
       Haptics.selectionAsync().catch(() => {})
