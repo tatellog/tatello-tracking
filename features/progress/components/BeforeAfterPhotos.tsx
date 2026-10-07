@@ -620,7 +620,9 @@ export function BeforeAfterPhotos({ hideEyebrow }: { hideEyebrow?: boolean }) {
   // "AHORA" sobre una foto vieja obligaba a la usuaria a explicar el hueco.
   const beforeLabel = stale && antesPhoto ? formatMonthYear(antesPhoto.taken_at) : 'Antes'
   const afterLabel = stale && ahoraPhoto ? formatMonthYear(ahoraPhoto.taken_at) : 'Ahora'
-  const chapterYear = lastShownIso ? new Date(lastShownIso).getFullYear() : null
+  const lastShownLabel = lastShownIso
+    ? `${Number(lastShownIso.slice(8, 10))} ${MESES_CORTOS[Number(lastShownIso.slice(5, 7)) - 1]} ${lastShownIso.slice(0, 4)}`
+    : null
 
   // Section eyebrow + empty-state header. The eyebrow ties this
   // section into the redesigned page architecture (each section
@@ -706,10 +708,10 @@ export function BeforeAfterPhotos({ hideEyebrow }: { hideEyebrow?: boolean }) {
 
       {/* Frescura honesta (patrón de Composición): el recuerdo fechado + la
           invitación de capítulo, sin presión. */}
-      {stale && chapterYear != null ? (
-        <Text style={styles.staleNote}>
-          Estas fotos son de {chapterYear}. Tu siguiente foto abre el capítulo de hoy.
-        </Text>
+      {/* Un hecho, no una frase (dueña 7 oct 2026): antes decía "Estas fotos
+          son de {año}" aunque una fuera de otro año. */}
+      {stale && lastShownLabel != null ? (
+        <Text style={styles.staleNote}>{`Tu foto más reciente es del ${lastShownLabel}.`}</Text>
       ) : null}
 
       {/* CTAs — "Comparar" (abre el slider de arrastrar) como acción principal.
@@ -1006,3 +1008,18 @@ const styles = StyleSheet.create({
     color: colors.magenta,
   },
 })
+
+const MESES_CORTOS = [
+  'ene',
+  'feb',
+  'mar',
+  'abr',
+  'may',
+  'jun',
+  'jul',
+  'ago',
+  'sep',
+  'oct',
+  'nov',
+  'dic',
+]

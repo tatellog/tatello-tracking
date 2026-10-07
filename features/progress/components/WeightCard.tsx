@@ -5,6 +5,7 @@ import { colors, typography } from '@/theme'
 
 import { describeWeightChange, weighInsForTrend, type WeightPoint } from '../logic'
 import { CountUp } from './CountUp'
+import { HealthCardHeader as CardHeader } from './HealthCardHeader'
 import { DropGlyph, ProgressRing, ScaleGlyph, TargetGlyph } from './HealthGlyphs'
 import { WeightChart, fmtShortDay } from './WeightChart'
 
@@ -156,41 +157,9 @@ export function WeightCard({
   )
 }
 
-/** El encabezado de cada tarjeta, igual en todas (como Salud): ícono animado,
- *  título en el color de su categoría y un dato a la derecha. */
-function CardHeader({
-  icon,
-  title,
-  color,
-  right,
-}: {
-  icon: React.ReactNode
-  title: string
-  color: string
-  right?: string
-}) {
-  return (
-    <View style={styles.head}>
-      <View style={styles.headTitle}>
-        {icon}
-        <Text style={[styles.title, { color }]}>{title}</Text>
-      </View>
-      {right ? <Text style={styles.headDate}>{right}</Text> : null}
-    </View>
-  )
-}
-
 const styles = StyleSheet.create({
   wrap: { gap: 12 },
   card: { borderRadius: 20, backgroundColor: colors.bgCard, padding: 16, gap: 14 },
-  head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  headTitle: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  title: { fontFamily: typography.uiBold, fontSize: typography.sizes.body },
-  headDate: {
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.label,
-    color: colors.niebla,
-  },
   numbers: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' },
   valueRow: { flexDirection: 'row', alignItems: 'baseline', gap: 5 },
   value: {

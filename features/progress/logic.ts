@@ -563,7 +563,7 @@ export function proteinAverageComparison(
 }
 
 /** Días entre dos YYYY-MM-DD sin parsear Date en caliente (Hermes). */
-function daysBetween(a: string, b: string): number {
+export function daysBetween(a: string, b: string): number {
   const [ay, am, ad] = a.split('-').map(Number) as [number, number, number]
   const [by, bm, bd] = b.split('-').map(Number) as [number, number, number]
   return Math.round(
@@ -1118,4 +1118,72 @@ export function compareHistory(
   ]
 
   return { windowDays: win, metrics: metrics.filter((x): x is MetricComparison => x != null) }
+}
+
+/* ─── Antes y ahora (dueña 7 oct 2026) ─────────────────────────────────────
+ *
+ * Fotos, historial y comparador en un solo módulo. Cada fecha con evidencia
+ * (foto del ángulo o medición) es una entrada con sus números de ESE día. El
+ * peso sale del check-in o, si no lo trae, de la medición más cercana (±7
+ * días) de la serie fusionada, así nunca contradice a la tarjeta de Peso.
+ */
+
+export type CompareEntry = {
+  day: string
+  photo: TimelinePhoto | null
+  weight: number | null
+  fat: number | null
+  muscle: number | null
+}
+
+const NEAR_MS = 7 * 24 * 60 * 60 * 1000
+
+export function buildCompareEntries(
+  checkins: readonly BodyCheckin[],
+  photos: readonly TimelinePhoto[],
+  angle: PhotoAngle | null,
+  weights: readonly WeightPoint[],
+): CompareEntry[] {
+  const byDay = new Map(checkins.map((c) => [c.measured_on, c]))
+  const photoDays = angle ? photoDatesFor(photos, angle) : []
+  const days = [...new Set([...checkins.map((c) => c.measured_on), ...photoDays])].sort()
+  const nearestWeight = (day: string): number | null => {
+    const [y, m, d] = day.split('-').map(Number) as [number, number, number]
+    const t = new Date(y, m - 1, d, 12).getTime()
+    let best: WeightPoint | null = null
+    for (const p of weights) {
+      if (Math.abs(p.t - t) > NEAR_MS) continue
+      if (!best || Math.abs(p.t - t) < Math.abs(best.t - t)) best = p
+    }
+    return best?.weight ?? null
+  }
+  return days
+    .map((day) => {
+      const c = byDay.get(day) ?? null
+      const photo = angle ? photoAt(photos, angle, day) : null
+      return {
+        day,
+        photo: photo?.signed_url ? photo : null,
+        weight: c?.weight_kg ?? nearestWeight(day),
+        fat: c?.body_fat_pct ?? null,
+        muscle: c?.muscle_kg ?? null,
+      }
+    })
+    .filter((e) => e.photo != null || e.weight != null || e.fat != null)
+}
+
+export type CompareDelta = { key: 'weight' | 'fat' | 'muscle'; label: string; text: string }
+
+/** Solo las métricas con dato en A y en B. La grasa va en puntos. */
+export function compareDeltas(a: CompareEntry, b: CompareEntry): CompareDelta[] {
+  const out: CompareDelta[] = []
+  const fmt = (v: number, unit: string) =>
+    `${v > 0 ? '↑' : v < 0 ? '↓' : '='} ${Math.abs(v).toFixed(1)} ${unit}`
+  if (a.weight != null && b.weight != null)
+    out.push({ key: 'weight', label: 'Peso', text: fmt(b.weight - a.weight, 'kg') })
+  if (a.fat != null && b.fat != null)
+    out.push({ key: 'fat', label: 'Grasa', text: fmt(b.fat - a.fat, 'puntos') })
+  if (a.muscle != null && b.muscle != null)
+    out.push({ key: 'muscle', label: 'Músculo', text: fmt(b.muscle - a.muscle, 'kg') })
+  return out
 }

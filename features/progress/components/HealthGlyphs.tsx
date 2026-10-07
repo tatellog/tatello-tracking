@@ -145,3 +145,138 @@ export function TargetGlyph({ size = 18, color }: { size?: number; color: string
     </Svg>
   )
 }
+
+/** Fotos (antes y ahora): dos marcos que se separan al aparecer. */
+export function FramesGlyph({ size = 18, color }: { size?: number; color: string }) {
+  const reduce = useReducedMotion()
+  const p = useSharedValue(reduce ? 1 : 0)
+  useEffect(() => {
+    if (reduce) return
+    p.value = withDelay(150, withSpring(1, { damping: 12, stiffness: 140 }))
+  }, [reduce, p])
+  const left = useAnimatedProps(() => ({ x: 6 - 3.5 * p.value }))
+  const right = useAnimatedProps(() => ({ x: 8 + 3.5 * p.value }))
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <AnimatedRect
+        y={5}
+        width={10}
+        height={14}
+        rx={2.5}
+        stroke={color}
+        strokeWidth={1.8}
+        opacity={0.6}
+        animatedProps={left}
+      />
+      <AnimatedRect
+        y={5}
+        width={10}
+        height={14}
+        rx={2.5}
+        stroke={color}
+        strokeWidth={1.8}
+        animatedProps={right}
+      />
+    </Svg>
+  )
+}
+
+const AnimatedLine = Animated.createAnimatedComponent(Path)
+
+/** Lista (mediciones): tres renglones que se dibujan uno tras otro. */
+export function ListGlyph({ size = 18, color }: { size?: number; color: string }) {
+  const reduce = useReducedMotion()
+  const p = useSharedValue(reduce ? 3 : 0)
+  useEffect(() => {
+    if (reduce) return
+    p.value = withDelay(150, withTiming(3, { duration: 650, easing: Easing.out(Easing.quad) }))
+  }, [reduce, p])
+  const r0 = useAnimatedProps(() => ({
+    strokeDashoffset: 11 * (1 - Math.max(0, Math.min(1, p.value))),
+  }))
+  const r1 = useAnimatedProps(() => ({
+    strokeDashoffset: 11 * (1 - Math.max(0, Math.min(1, p.value - 1))),
+  }))
+  const r2 = useAnimatedProps(() => ({
+    strokeDashoffset: 11 * (1 - Math.max(0, Math.min(1, p.value - 2))),
+  }))
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      {[6, 12, 18].map((y) => (
+        <Circle key={y} cx={5} cy={y} r={1.3} fill={color} />
+      ))}
+      <AnimatedLine
+        d="M9 6h11"
+        stroke={color}
+        strokeWidth={1.8}
+        strokeLinecap="round"
+        strokeDasharray="11 11"
+        animatedProps={r0}
+      />
+      <AnimatedLine
+        d="M9 12h11"
+        stroke={color}
+        strokeWidth={1.8}
+        strokeLinecap="round"
+        strokeDasharray="11 11"
+        animatedProps={r1}
+      />
+      <AnimatedLine
+        d="M9 18h11"
+        stroke={color}
+        strokeWidth={1.8}
+        strokeLinecap="round"
+        strokeDasharray="11 11"
+        animatedProps={r2}
+      />
+    </Svg>
+  )
+}
+
+/** Grasa: un círculo que se llena hasta la mitad. */
+export function FatGlyph({ size = 16, color }: { size?: number; color: string }) {
+  const reduce = useReducedMotion()
+  const level = useSharedValue(reduce ? 1 : 0)
+  useEffect(() => {
+    if (reduce) return
+    level.value = withDelay(200, withTiming(1, { duration: 600, easing: Easing.out(Easing.cubic) }))
+  }, [reduce, level])
+  const fill = useAnimatedProps(() => ({ y: 20 - 8 * level.value, height: 8 * level.value }))
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Defs>
+        <ClipPath id="fat-clip">
+          <Circle cx={12} cy={12} r={8} />
+        </ClipPath>
+      </Defs>
+      <G clipPath="url(#fat-clip)">
+        <AnimatedRect x={0} width={24} fill={color} opacity={0.45} animatedProps={fill} />
+      </G>
+      <Circle cx={12} cy={12} r={8} stroke={color} strokeWidth={1.8} />
+    </Svg>
+  )
+}
+
+/** Músculo: una mancuerna que aparece con un pequeño rebote. */
+export function DumbbellGlyph({ size = 16, color }: { size?: number; color: string }) {
+  const reduce = useReducedMotion()
+  const s = useSharedValue(reduce ? 1 : 0.6)
+  useEffect(() => {
+    if (reduce) return
+    s.value = withDelay(200, withSpring(1, { damping: 8, stiffness: 160 }))
+  }, [reduce, s])
+  const g = useAnimatedProps(() => ({ scale: s.value, originX: 12, originY: 12 }))
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <AnimatedG animatedProps={g}>
+        <Path d="M7 12h10" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
+        <Path
+          d="M5 8v8M8 7v10M16 7v10M19 8v8"
+          stroke={color}
+          strokeWidth={1.8}
+          strokeLinecap="round"
+        />
+      </AnimatedG>
+    </Svg>
+  )
+}

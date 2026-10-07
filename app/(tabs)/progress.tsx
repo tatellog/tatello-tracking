@@ -1,5 +1,5 @@
 import { useFocusEffect, useRouter } from 'expo-router'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeIn } from 'react-native-reanimated'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -13,8 +13,7 @@ import { useSignalsHistory } from '@/features/orbit/hooks'
 import { daysInDeficit } from '@/features/orbit/month-built'
 import { useProfile } from '@/features/profile/hooks'
 import { BeforeAfterPhotos } from '@/features/progress/components/BeforeAfterPhotos'
-import { CheckinCompare } from '@/features/progress/components/CheckinCompare'
-import { EvidenceTimeline } from '@/features/progress/components/EvidenceTimeline'
+import { BeforeAfterModule } from '@/features/progress/components/BeforeAfterModule'
 import { CompositionCards } from '@/features/progress/components/CompositionCards'
 import { HistoryChips } from '@/features/progress/components/HistoryChips'
 import { AiImportPill } from '@/features/progress/components/AiImportPill'
@@ -97,20 +96,7 @@ function ProgressBody() {
     track(PROGRESS_EVENTS.body)
     setSegment('body')
   }
-  // Fusión "detalle de medición": tap en el timeline preselecciona el comparador
-  // Y hace scroll hasta él (sin el scroll, el tap no tenía ningún feedback
-  // visible). El preset se limpia al cambiar de segmento: pegado, servía "mejor
-  // momento vs peor momento" como default (casi hace cerrar la app · beta).
-  const [comparePresetA, setComparePresetA] = useState<string | null>(null)
   const scrollRef = useRef<ScrollView>(null)
-  const compareY = useRef(0)
-  useEffect(() => {
-    if (segment !== 'body') setComparePresetA(null)
-  }, [segment])
-  const pickCompare = useCallback((day: string) => {
-    setComparePresetA(day)
-    scrollRef.current?.scrollTo({ y: compareY.current, animated: true })
-  }, [])
   const measurementsQuery = useMeasurements(null)
   const checkinsQuery = useBodyCheckins()
   // Báscula (spec wearables §9): rellena los días sin registro propio.
@@ -357,19 +343,13 @@ function ProgressBody() {
                   <CompositionCards />
                   {/* F4 · evolución por zona (segmental de los check-ins). */}
                   <ZonesEvolution />
-                  {/* Historial → comparador (tap en estrella aterriza abajo,
-                      con scroll real hasta él). */}
-                  {/* FUSIÓN (dueña): historial + evolución visual eran dos
-                      rieles gemelos — ahora UNA línea del tiempo con toda la
-                      evidencia (fotos + números). */}
-                  <EvidenceTimeline onPick={pickCompare} />
-                  <View
-                    onLayout={(e) => {
-                      compareY.current = e.nativeEvent.layout.y
-                    }}
-                  >
-                    <CheckinCompare presetA={comparePresetA} />
-                  </View>
+                  {/* Antes y ahora (dueña 7 oct 2026): historial + fotos +
+                      comparador en un solo módulo, estilo Salud. */}
+                  <View style={styles.sectionGap} />
+                  <BeforeAfterModule
+                    weights={allPoints}
+                    onOpenTable={() => router.push('/progress-table')}
+                  />
                 </>
               ) : null}
 
