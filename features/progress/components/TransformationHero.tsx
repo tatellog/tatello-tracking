@@ -122,8 +122,13 @@ export function TransformationHero() {
     const peakPoint = recovery
       ? smoothed.reduce((a, b) => (b.weight > a.weight ? b : a), first)
       : null
-    const from = recovery ? recovery.peakKg : first.weight
-    const deltaKg = Number((last.weight - from).toFixed(1))
+    // Los NÚMEROS son mediciones reales (dueña 7 oct 2026: el mismo peso que la
+    // tarjeta de Peso, con su fecha); el promedio solo dibuja el arco.
+    const rawFirst = fused[0]!
+    const rawLast = fused[fused.length - 1]!
+    const rawPeak = fused.reduce((a, b) => (b.weight > a.weight ? b : a), rawFirst)
+    const from = recovery ? rawPeak.weight : rawFirst.weight
+    const deltaKg = Number((rawLast.weight - from).toFixed(1))
 
     // Las partículas del arco viven en FECHAS reales: puntos intermedios de
     // la serie entre el ancla (pico o inicio) y hoy, t proporcional al
@@ -145,10 +150,10 @@ export function TransformationHero() {
 
     return {
       from,
-      to: last.weight,
+      to: rawLast.weight,
       deltaKg,
-      count: smoothed.length,
-      lastT: last.t,
+      count: fused.length,
+      lastT: rawLast.t,
       recovery,
       sparkTs,
     }
@@ -283,6 +288,9 @@ export function TransformationHero() {
     lastDate.getFullYear() !== new Date().getFullYear() ? ` ${lastDate.getFullYear()}` : ''
   }`
   const fromLabel = hero.recovery ? 'El pico' : 'Empezaste'
+  // "Hoy" solo si la última medición es de hoy; si no, su fecha.
+  const isToday = lastDate.toDateString() === new Date().toDateString()
+  const toLabel = isToday ? 'Hoy' : `${lastDate.getDate()} ${MESES[lastDate.getMonth()]}`
 
   return (
     <Animated.View
@@ -413,7 +421,7 @@ export function TransformationHero() {
                 <Text style={styles.to}>{hero.to.toFixed(1)}</Text>
                 <Text style={styles.toUnit}>kg</Text>
               </View>
-              <Text style={[styles.endLabel, styles.endLabelRight]}>Hoy</Text>
+              <Text style={[styles.endLabel, styles.endLabelRight]}>{toLabel}</Text>
             </View>
           </View>
           {hero.deltaKg !== 0 ? (

@@ -10,6 +10,16 @@ export type WeightPoint = {
   t: number
   /** Peso en kg, garantizado no-null. */
   weight: number
+  /** De dónde vino (app, coach o báscula); se muestra al tocar el punto. */
+  source?: WeightSource
+}
+
+export type WeightSource = 'app' | 'coach' | 'scale'
+
+export const WEIGHT_SOURCE_LABEL: Record<WeightSource, string> = {
+  app: 'Manual',
+  coach: 'Coach',
+  scale: 'Báscula',
 }
 
 /*
@@ -191,19 +201,81 @@ export function mergeWeightSeries(
   // La báscula (spec wearables §9) va PRIMERO = menor prioridad: rellena los
   // días sin registro propio; cualquier manual del mismo día la pisa.
   for (const s of scale) {
-    byDay.set(s.day_date, { t: new Date(s.measured_at).getTime(), weight: s.weight_kg })
+    byDay.set(s.day_date, {
+      t: new Date(s.measured_at).getTime(),
+      weight: s.weight_kg,
+      source: 'scale',
+    })
   }
   for (const c of checkins) {
     if (c.weight_kg == null) continue
     const [y, m, d] = c.measured_on.split('-').map(Number) as [number, number, number]
-    byDay.set(c.measured_on, { t: new Date(y, m - 1, d, 8).getTime(), weight: c.weight_kg })
+    byDay.set(c.measured_on, {
+      t: new Date(y, m - 1, d, 8).getTime(),
+      weight: c.weight_kg,
+      source: 'coach',
+    })
   }
   for (const m of measurements) {
     if (m.weight_kg == null) continue
     const day = m.measured_at.slice(0, 10)
-    byDay.set(day, { t: new Date(m.measured_at).getTime(), weight: m.weight_kg })
+    byDay.set(day, { t: new Date(m.measured_at).getTime(), weight: m.weight_kg, source: 'app' })
   }
   return [...byDay.values()].sort((a, b) => a.t - b.t)
+}
+
+/* ─── La tarjeta de Peso (estilo Salud, dueña 7 oct 2026) ─────────────────
+ *
+ * Cada número dice desde cuándo y con cuántos datos. Con 4+ mediciones el
+ * cambio va de promedio (7 días) a promedio, para que un pesaje suelto no sea
+ * la noticia; con menos, de medición a medición, sin disfrazarlo de tendencia.
+ */
+
+/** Mediciones mínimas en el rango para hablar de tendencia. */
+export const MIN_TREND_POINTS = 4
+
+export type WeightChange = {
+  /** kg (último − primero), redondeado a 0.1. */
+  abs: number
+  fromT: number
+  toT: number
+  /** Mediciones en el rango. */
+  n: number
+  /** 'avg' = promedio 7 días a promedio; 'raw' = medición a medición. */
+  mode: 'avg' | 'raw'
+}
+
+export function describeWeightChange(raw: readonly WeightPoint[]): WeightChange | null {
+  const first = raw[0]
+  const last = raw[raw.length - 1]
+  if (!first || !last || raw.length < 2) return null
+  const mode = raw.length >= MIN_TREND_POINTS ? 'avg' : 'raw'
+  const series = mode === 'avg' ? smoothWeightPoints([...raw]) : raw
+  const a = series[0]!.weight
+  const b = series[series.length - 1]!.weight
+  return {
+    abs: Math.round((b - a) * 10) / 10,
+    fromT: first.t,
+    toT: last.t,
+    n: raw.length,
+    mode,
+  }
+}
+
+/** Cuántos pesajes faltan para que haya tendencia (0 = ya hay). */
+export function weighInsForTrend(n: number): number {
+  return Math.max(0, MIN_TREND_POINTS - n)
+}
+
+/** Tres marcas de kilos redondos que cubren los puntos (eje de la gráfica). */
+export function weightAxisTicks(points: readonly WeightPoint[]): [number, number, number] {
+  if (points.length === 0) return [0, 1, 2]
+  const ws = points.map((p) => p.weight)
+  const lo = Math.floor(Math.min(...ws) - 0.3)
+  const hi = Math.max(...ws) + 0.3
+  let step = Math.max(1, Math.ceil((hi - lo) / 2))
+  while (lo + 2 * step < hi) step += 1
+  return [lo, lo + step, lo + 2 * step]
 }
 
 /* ─── Export CSV (propiedad de datos · decisión benchmark) ───────────────

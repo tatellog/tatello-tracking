@@ -20,44 +20,21 @@ import { HistoryChips } from '@/features/progress/components/HistoryChips'
 import { AiImportPill } from '@/features/progress/components/AiImportPill'
 import { LinkCta } from '@/features/progress/components/LinkCta'
 import { SynthesisCard } from '@/features/progress/components/SynthesisCard'
-import { TrajectoryChart } from '@/features/progress/components/TrajectoryChart'
+import {
+  WEIGHT_PERIODS,
+  WeightCard,
+  type WeightPeriod,
+} from '@/features/progress/components/WeightCard'
 import { TransformationHero } from '@/features/progress/components/TransformationHero'
 import { ZonesEvolution } from '@/features/progress/components/ZonesEvolution'
 import { PROGRESS_EVENTS } from '@/features/progress/constants'
 import { ProgressInsightCard } from '@/features/progress/components/ProgressInsightCard'
 import { PROGRESS_BODY_ENABLED } from '@/lib/featureFlags'
 import { useBodyCheckins, useMeasurements } from '@/features/progress/hooks'
-import {
-  computeDelta,
-  computeTrend,
-  formatTrendCopy,
-  mergeWeightSeries,
-  smoothWeightPoints,
-} from '@/features/progress/logic'
-import { CoachLine, PrimaryCta, SkyBackground, TabHeader } from '@/features/tabs/components'
+import { mergeWeightSeries } from '@/features/progress/logic'
+import { PrimaryCta, SkyBackground, TabHeader } from '@/features/tabs/components'
 import { colors, typography } from '@/theme'
 import { useWearableWeights } from '@/features/wearables/hooks'
-
-// `ALL` (not `TODO`) for the "todo el historial" option — the all-caps
-// Spanish word read as a dev-leftover marker in grep + tripped code
-// review tools. English keys + Spanish display labels mirrors the
-// pattern in RangeChips.tsx.
-type Period = '7D' | '30D' | '90D' | 'ALL'
-
-const PERIOD_DAYS: Record<Period, number | null> = {
-  '7D': 7,
-  '30D': 30,
-  '90D': 90,
-  ALL: null,
-}
-
-// Display labels — the pills read in plain Spanish.
-const PERIOD_LABEL: Record<Period, string> = {
-  '7D': '7 días',
-  '30D': '30 días',
-  '90D': '90 días',
-  ALL: 'Todo',
-}
 
 // Los dos segmentos de Progress (Epic 01): Historia (¿qué cambió en mis hábitos?)
 // y Body (¿qué cambió en mi cuerpo?, Epic 02 lo llena). Como Órbita Día/Semana/Mes.
@@ -114,7 +91,7 @@ function ProgressBody() {
   )
   const router = useRouter()
   const [segment, setSegment] = useState<ProgressSegment>('historia')
-  const [period, setPeriod] = useState<Period>('30D')
+  const [period, setPeriod] = useState<WeightPeriod>('M')
 
   const goBody = () => {
     track(PROGRESS_EVENTS.body)
@@ -140,68 +117,47 @@ function ProgressBody() {
   const scaleWeights = useWearableWeights()
   const { data: profile } = useProfile()
 
-  // UNA sola serie de peso (app + check-ins del coach) — la misma verdad que el
-  // hero. El periodo se recorta client-side sobre la serie fusionada.
+  // UNA sola serie de peso (app + coach + báscula), cruda: el número grande es
+  // tu última medición real con su fecha; el periodo recorta la gráfica.
+  const allPoints = useMemo(
+    () =>
+      mergeWeightSeries(
+        measurementsQuery.data ?? [],
+        checkinsQuery.data ?? [],
+        scaleWeights.data ?? [],
+      ),
+    [measurementsQuery.data, checkinsQuery.data, scaleWeights.data],
+  )
   const points = useMemo(() => {
-    const fused = mergeWeightSeries(
-      measurementsQuery.data ?? [],
-      checkinsQuery.data ?? [],
-      scaleWeights.data ?? [],
-    )
-    const days = PERIOD_DAYS[period]
-    if (days == null) return fused
+    const days = WEIGHT_PERIODS.find((p) => p.key === period)?.days ?? 30
     const since = Date.now() - days * 24 * 60 * 60 * 1000
-    return fused.filter((p) => p.t >= since)
-  }, [measurementsQuery.data, checkinsQuery.data, scaleWeights.data, period])
-  // Weight is shown smoothed — a trailing 7-day moving average — so a
-  // single noisy weigh-in never becomes the trend, the delta or the
-  // headline number. The raw `points` are kept only for the count.
-  const smoothed = useMemo(() => smoothWeightPoints(points), [points])
-  const delta = useMemo(() => computeDelta(smoothed), [smoothed])
-  const trend = useMemo(() => computeTrend(smoothed), [smoothed])
+    return allPoints.filter((p) => p.t >= since)
+  }, [allPoints, period])
+  const latestPoint = allPoints[allPoints.length - 1] ?? null
+  const first = allPoints[0]
+  const count = allPoints.length
 
-  const first = smoothed[0]
-  const last = smoothed[smoothed.length - 1]
-  const count = points.length
-
-  // "Báscula quieta, esfuerzo presente" (benchmark · el momento exacto donde
-  // una abandona): cuando los 30 días RODANTES están planos pero hubo días en
-  // déficit, esa constatación vive AQUÍ, junto al peso — antes la usuaria
-  // tenía que armarla a mano cruzando a Historia. Hechos, cero promesa de
-  // resultado (línea roja: nunca "pronto se reflejará").
+  // Peso y comida juntos: tus días en déficit de los últimos 30 días.
   const targets = useMacroTargets().data
   const signals30 = useSignalsHistory(30)
-  const plateauNote = useMemo(() => {
-    const fused = mergeWeightSeries(
-      measurementsQuery.data ?? [],
-      checkinsQuery.data ?? [],
-      scaleWeights.data ?? [],
-    )
-    const since = Date.now() - 30 * 24 * 60 * 60 * 1000
-    const smoothed30 = smoothWeightPoints(fused.filter((p) => p.t >= since))
-    const d = computeDelta(smoothed30)
-    // Plano = |cambio| < 0.3 kg con al menos 3 puntos (menos es "sin datos",
-    // no "sin movimiento").
-    if (!d || smoothed30.length < 3 || Math.abs(d.abs) >= 0.3) return null
+  const deficitCard = useMemo(() => {
     const summary = daysInDeficit(signals30.data ?? [], {
       calorieTarget: targets?.calories ?? null,
     })
-    // Mismo umbral que la Síntesis (MIN_DEFICIT_DAYS): menos de 3 días en
-    // déficit no se nombra como esfuerzo.
-    if (summary == null || summary.deficitDays < 3) return null
-    return `La báscula casi no se movió estos 30 días. Tus ${summary.deficitDays} días en déficit sí quedaron registrados.`
-  }, [
-    measurementsQuery.data,
-    checkinsQuery.data,
-    scaleWeights.data,
-    signals30.data,
-    targets?.calories,
-  ])
+    if (summary == null || summary.foodLoggedDays < 3) return null
+    return { days: summary.deficitDays, of: summary.foodLoggedDays }
+  }, [signals30.data, targets?.calories])
 
   // Cycle phase — used to caption the weight chart so a luteal
   // water-weight bump reads as biology, not regression. (Único hogar del
   // ciclo en este tab; la card standalone se fue de Historia.)
   const cycle = useCyclePhase()
+  const cycleCard =
+    cycle?.phase === 'lutea'
+      ? { day: cycle.day, note: 'La semana antes de tu período el peso puede subir por agua.' }
+      : cycle?.phase === 'menstrual'
+        ? { day: cycle.day, note: 'Estás en tu período: el peso puede subir por agua.' }
+        : null
 
   // The user's declared focus for the month. When it isn't weight,
   // the "Tu cuerpo" section says so — the number is reference, not a
@@ -319,8 +275,9 @@ function ProgressBody() {
                   secciones respiran sin hairlines. */}
               <View style={styles.sectionGap} />
 
-              {/* ── Body: Tu cuerpo — peso + medidas. Epic 02/F2: composición
-                  con sparklines + comparador de fechas. ── */}
+              {/* ── Body: Tu cuerpo · la tarjeta de Peso estilo Salud (dueña
+                  7 oct 2026): último peso con fecha, cambio con su tramo,
+                  gráfica de mediciones, ciclo y días en déficit. ── */}
               <EyebrowLabel tone="magenta" size={10} style={styles.heroEyebrow}>
                 Tu cuerpo
               </EyebrowLabel>
@@ -328,136 +285,17 @@ function ProgressBody() {
                 <Text style={styles.focusNote}>
                   Tu enfoque este mes no es el peso. Esto es solo una referencia, sin metas.
                 </Text>
-              ) : hasTrajectory ? (
-                <Text style={styles.patientSub}>
-                  El cuerpo cambia despacio. Mira la tendencia, no el número del día.
-                </Text>
               ) : null}
-              {weightLoading ? null : hasTrajectory ? (
-                <>
-                  <Animated.View
-                    entering={FadeIn.duration(360).delay(80)}
-                    style={styles.weightHead}
-                  >
-                    {/* Peso ACTUAL — calmo, no gigante: un indicador más, no la
-                    meta. El cambio total va como chip, la tendencia en la
-                    gráfica. */}
-                    <View>
-                      <EyebrowLabel tone="niebla" size={11} style={styles.weightLabel}>
-                        Peso actual
-                      </EyebrowLabel>
-                      <View style={styles.weightNowRow}>
-                        <Text style={styles.weightNow}>{last?.weight.toFixed(1)}</Text>
-                        <Text style={styles.weightUnit}>kg</Text>
-                      </View>
-                    </View>
-                    {delta ? (
-                      <View style={styles.deltaChip}>
-                        {/* "Total" SOLO cuando el periodo es Todo: la etiqueta fija
-                            contradecía al hero (−2.2 "total" vs −0.1 "total") y
-                            rompía la confianza en ambos números. */}
-                        <Text style={styles.deltaChipLabel}>
-                          {period === 'ALL'
-                            ? 'Cambio total'
-                            : `Cambio · ${PERIOD_LABEL[period].toLowerCase()}`}
-                        </Text>
-                        <Text style={styles.deltaChipNum}>{formatDelta(delta.abs)} kg</Text>
-                      </View>
-                    ) : null}
-                  </Animated.View>
-
-                  {/* Comparación temporal — antes → ahora en el periodo elegido. */}
-                  {first && last ? (
-                    <Text style={styles.comparison}>
-                      <Text style={styles.compFrom}>{first.weight.toFixed(1)}</Text>
-                      <Text style={styles.compArrow}>{'  →  '}</Text>
-                      <Text style={styles.compTo}>{last.weight.toFixed(1)} kg</Text>
-                      <Text
-                        style={styles.compPeriod}
-                      >{`   ·   ${PERIOD_LABEL[period].toLowerCase()}`}</Text>
-                    </Text>
-                  ) : null}
-
-                  {/* Báscula quieta + esfuerzo presente, juntos (siempre sobre
-                      los 30 días rodantes, independiente del chip de periodo). */}
-                  {plateauNote ? (
-                    <Animated.View entering={FadeIn.duration(360).delay(200)}>
-                      <Text style={styles.plateauNote}>{plateauNote}</Text>
-                    </Animated.View>
-                  ) : null}
-
-                  {/* Period filter — only meaningful once there are 2+ marks. */}
-                  <Animated.View
-                    entering={FadeIn.duration(320).delay(160)}
-                    style={styles.periodPill}
-                  >
-                    {(Object.keys(PERIOD_DAYS) as Period[]).map((p) => {
-                      const on = p === period
-                      return (
-                        <Pressable
-                          key={p}
-                          onPress={() => setPeriod(p)}
-                          style={[styles.periodSeg, on && styles.periodSegOn]}
-                          accessibilityRole="button"
-                          accessibilityState={{ selected: on }}
-                        >
-                          <Text style={[styles.periodLabel, on && styles.periodLabelOn]}>
-                            {PERIOD_LABEL[p]}
-                          </Text>
-                        </Pressable>
-                      )
-                    })}
-                  </Animated.View>
-
-                  <Animated.View
-                    entering={FadeIn.duration(360).delay(240)}
-                    style={styles.chartSection}
-                  >
-                    {/* La punteada proyecta desde el ritmo OBSERVADO (nunca desde un
-                    plan con fecha): cuando la realidad cambia, la línea cambia
-                    sin que nadie "incumpla". */}
-                    <Text style={styles.chartCaption}>
-                      {count} mediciones · la línea es tu promedio de la semana
-                      {trend ? ' · la punteada sigue tu ritmo real' : ''}
-                    </Text>
-                    <TrajectoryChart points={smoothed} trend={trend} />
-                    {/* Epic 08: la tendencia completa vive en su pantalla. */}
-                    <LinkCta
-                      label="Ver tendencia →"
-                      onPress={() => router.push('/weight-trend')}
-                      accessibilityLabel="Ver la tendencia completa de tu peso"
-                    />
-                  </Animated.View>
-
-                  {/* Cycle context — weight genuinely shifts with the
-                  cycle's water balance; the chart says so, so a
-                  luteal bump isn't read as a setback. */}
-                  {cycle && (cycle.phase === 'lutea' || cycle.phase === 'menstrual') ? (
-                    <Animated.View entering={FadeIn.duration(360).delay(290)}>
-                      <Text style={styles.cycleNote}>
-                        {cycle.phase === 'lutea'
-                          ? 'La semana antes de tu período tu cuerpo retiene agua: la báscula sube por agua, no por grasa.'
-                          : 'Estás menstruando: el peso se mueve por agua, no por grasa.'}
-                      </Text>
-                    </Animated.View>
-                  ) : null}
-
-                  {trend ? (
-                    <Animated.View entering={FadeIn.duration(360).delay(320)}>
-                      <CoachLine text={formatTrendCopy(trend)} />
-                    </Animated.View>
-                  ) : null}
-                  {/* El "show more" pegado a su muestra (uxui): esta puerta
-                      era la más misteriosa al fondo del scroll. */}
-                  {PROGRESS_BODY_ENABLED ? (
-                    <LinkCta
-                      label="Más observaciones como esta →"
-                      onPress={() => router.push('/stelar-observes')}
-                      accessibilityLabel="Ver más observaciones de tus datos"
-                      style={styles.bridgeLink}
-                    />
-                  ) : null}
-                </>
+              {weightLoading ? null : hasTrajectory && latestPoint ? (
+                <WeightCard
+                  points={points}
+                  latest={latestPoint}
+                  period={period}
+                  onPeriod={setPeriod}
+                  onOpenAll={() => router.push('/weight-trend')}
+                  cycle={cycleCard}
+                  deficit={deficitCard}
+                />
               ) : (
                 <Animated.View entering={FadeIn.duration(360).delay(80)} style={styles.heroEmpty}>
                   {count === 1 && first ? (
@@ -466,9 +304,7 @@ function ProgressBody() {
                       <Text style={styles.firstWeightUnit}>kg</Text>
                     </View>
                   ) : (
-                    <Text style={styles.heroEmptyTitle}>
-                      Tu primera marca pone una estrella en el cielo.
-                    </Text>
+                    <Text style={styles.heroEmptyTitle}>Registra tu peso para empezar.</Text>
                   )}
 
                   {/* La anticipación vive en el "cuándo" (mañana), no en un
@@ -477,8 +313,8 @@ function ProgressBody() {
                       mañana" (uxui). */}
                   <Text style={styles.heroEmptyHint}>
                     {count === 0
-                      ? 'Marca tu peso para empezar a trazar tu trayectoria.'
-                      : 'Tu primera marca ya está en el cielo. La siguiente dibuja la línea.'}
+                      ? 'Con 2 mediciones aparece tu gráfica.'
+                      : 'Con la siguiente medición aparece tu gráfica.'}
                   </Text>
 
                   <View style={styles.heroCtaWrap}>
@@ -502,12 +338,6 @@ function ProgressBody() {
                     accessibilityLabel="Agregar fotos de otra fecha"
                     style={styles.bridgeLink}
                   />
-
-                  {/* Cierre corto: el aire de abajo queda DESPUÉS de un
-                      cierre, no como pantalla incompleta. */}
-                  <Text style={styles.emptyCloser}>
-                    Cada marca enciende algo nuevo aquí. Este cielo se llena contigo.
-                  </Text>
                 </Animated.View>
               )}
 
@@ -570,13 +400,6 @@ function ProgressBody() {
       </SafeAreaView>
     </View>
   )
-}
-
-function formatDelta(kg: number | undefined): string {
-  if (kg == null) return '·'
-  if (kg === 0) return '0.0'
-  const sign = kg < 0 ? '−' : '+'
-  return `${sign}${Math.abs(kg).toFixed(1)}`
 }
 
 const styles = StyleSheet.create({
