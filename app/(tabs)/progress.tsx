@@ -14,6 +14,7 @@ import { daysInDeficit } from '@/features/orbit/month-built'
 import { useProfile } from '@/features/profile/hooks'
 import { BeforeAfterPhotos } from '@/features/progress/components/BeforeAfterPhotos'
 import { BeforeAfterModule } from '@/features/progress/components/BeforeAfterModule'
+import { consumeBodyCompare } from '@/features/progress/pending-compare'
 import { CompositionCards } from '@/features/progress/components/CompositionCards'
 import { HistoryChips } from '@/features/progress/components/HistoryChips'
 import { AiImportPill } from '@/features/progress/components/AiImportPill'
@@ -96,6 +97,28 @@ function ProgressBody() {
     setSegment('body')
   }
   const scrollRef = useRef<ScrollView>(null)
+  // Al guardar/importar una medición (o desde un detalle), "Antes y ahora"
+  // abre con anterior vs nueva: el buzón se consume al enfocar Progreso.
+  const compareY = useRef(0)
+  const [comparePreset, setComparePreset] = useState<{
+    a: string
+    b: string
+    nonce: number
+  } | null>(null)
+  useFocusEffect(
+    useCallback(() => {
+      const req = consumeBodyCompare()
+      if (!req) return
+      setSegment('body')
+      setComparePreset({ ...req, nonce: Date.now() })
+      const t = setTimeout(
+        () =>
+          scrollRef.current?.scrollTo({ y: Math.max(0, compareY.current - 16), animated: true }),
+        450,
+      )
+      return () => clearTimeout(t)
+    }, []),
+  )
   const measurementsQuery = useMeasurements(null)
   const checkinsQuery = useBodyCheckins()
   // Báscula (spec wearables §9): rellena los días sin registro propio.
@@ -341,10 +364,17 @@ function ProgressBody() {
                   {/* Antes y ahora (dueña 7 oct 2026): historial + fotos +
                       comparador en un solo módulo, estilo Salud. */}
                   <View style={styles.sectionGap} />
-                  <BeforeAfterModule
-                    weights={allPoints}
-                    onOpenTable={() => router.push('/progress-table')}
-                  />
+                  <View
+                    onLayout={(e) => {
+                      compareY.current = e.nativeEvent.layout.y
+                    }}
+                  >
+                    <BeforeAfterModule
+                      weights={allPoints}
+                      onOpenTable={() => router.push('/progress-table')}
+                      preset={comparePreset}
+                    />
+                  </View>
                 </>
               ) : null}
 

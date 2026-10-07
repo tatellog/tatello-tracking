@@ -1134,6 +1134,9 @@ export type CompareEntry = {
   weight: number | null
   fat: number | null
   muscle: number | null
+  water: number | null
+  visceral: number | null
+  bmi: number | null
 }
 
 const NEAR_MS = 7 * 24 * 60 * 60 * 1000
@@ -1167,12 +1170,19 @@ export function buildCompareEntries(
         weight: c?.weight_kg ?? nearestWeight(day),
         fat: c?.body_fat_pct ?? null,
         muscle: c?.muscle_kg ?? null,
+        water: c?.water_pct ?? null,
+        visceral: c?.visceral_fat_index ?? null,
+        bmi: c?.bmi ?? null,
       }
     })
     .filter((e) => e.photo != null || e.weight != null || e.fat != null)
 }
 
-export type CompareDelta = { key: 'weight' | 'fat' | 'muscle'; label: string; text: string }
+export type CompareDelta = {
+  key: 'weight' | 'fat' | 'muscle' | 'water' | 'visceral' | 'bmi'
+  label: string
+  text: string
+}
 
 /** Solo las métricas con dato en A y en B. La grasa va en puntos. */
 export function compareDeltas(a: CompareEntry, b: CompareEntry): CompareDelta[] {
@@ -1185,5 +1195,11 @@ export function compareDeltas(a: CompareEntry, b: CompareEntry): CompareDelta[] 
     out.push({ key: 'fat', label: 'Grasa', text: fmt(b.fat - a.fat, 'puntos') })
   if (a.muscle != null && b.muscle != null)
     out.push({ key: 'muscle', label: 'Músculo', text: fmt(b.muscle - a.muscle, 'kg') })
-  return out
+  if (a.water != null && b.water != null)
+    out.push({ key: 'water', label: 'Agua', text: fmt(b.water - a.water, 'puntos') })
+  if (a.visceral != null && b.visceral != null)
+    out.push({ key: 'visceral', label: 'Grasa visceral', text: fmt(b.visceral - a.visceral, '') })
+  if (a.bmi != null && b.bmi != null)
+    out.push({ key: 'bmi', label: 'IMC', text: fmt(b.bmi - a.bmi, '') })
+  return out.map((d) => ({ ...d, text: d.text.trim() }))
 }

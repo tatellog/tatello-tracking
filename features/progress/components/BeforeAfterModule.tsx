@@ -1,5 +1,5 @@
 import * as Haptics from 'expo-haptics'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeIn } from 'react-native-reanimated'
 
@@ -19,7 +19,14 @@ import {
   type WeightPoint,
 } from '../logic'
 import { HealthCardHeader } from './HealthCardHeader'
-import { DumbbellGlyph, FatGlyph, FramesGlyph, ListGlyph, ScaleGlyph } from './HealthGlyphs'
+import {
+  DropGlyph,
+  DumbbellGlyph,
+  FatGlyph,
+  FramesGlyph,
+  ListGlyph,
+  ScaleGlyph,
+} from './HealthGlyphs'
 
 /*
  * Antes y ahora (dueña 7 oct 2026): el historial, las fotos y el comparador de
@@ -44,10 +51,13 @@ const LIST_PREVIEW = 5
 export function BeforeAfterModule({
   weights,
   onOpenTable,
+  preset,
 }: {
   /** La serie de peso fusionada (la misma de la tarjeta de Peso). */
   weights: readonly WeightPoint[]
   onOpenTable: () => void
+  /** A/B elegidos desde fuera (al guardar una medición: anterior vs nueva). */
+  preset?: { a: string; b: string; nonce: number } | null
 }) {
   const checkins = useBodyCheckins().data
   const photos = usePhotoTimeline().data
@@ -66,6 +76,12 @@ export function BeforeAfterModule({
   const [bDay, setBDay] = useState<string | null>(null)
   const [side, setSide] = useState<'A' | 'B'>('B')
   const [showAll, setShowAll] = useState(false)
+  useEffect(() => {
+    if (!preset) return
+    setADay(preset.a)
+    setBDay(preset.b)
+    setSide('B')
+  }, [preset])
 
   if (entries.length < 2) return null
 
@@ -111,8 +127,12 @@ export function BeforeAfterModule({
                 <View style={styles.deltaName}>
                   {d.key === 'weight' ? (
                     <ScaleGlyph size={16} color={colors.bone} />
-                  ) : d.key === 'fat' ? (
+                  ) : d.key === 'fat' || d.key === 'visceral' ? (
                     <FatGlyph color={colors.bone} />
+                  ) : d.key === 'water' ? (
+                    <DropGlyph size={16} color={colors.bone} />
+                  ) : d.key === 'bmi' ? (
+                    <ScaleGlyph size={16} color={colors.bone} />
                   ) : (
                     <DumbbellGlyph color={colors.bone} />
                   )}

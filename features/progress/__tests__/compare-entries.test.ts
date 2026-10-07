@@ -37,10 +37,29 @@ test('daysBetween + elapsedLabel', () => {
 })
 
 test('compareDeltas: solo métricas con dato en ambos lados; grasa en puntos', () => {
-  const a = { day: 'a', photo: null, weight: 66.8, fat: 31.1, muscle: 43.7 }
-  const b = { day: 'b', photo: null, weight: 72.1, fat: 36.8, muscle: null }
+  const a = {
+    day: 'a',
+    photo: null,
+    weight: 66.8,
+    fat: 31.1,
+    muscle: 43.7,
+    water: 48,
+    visceral: null,
+    bmi: 24.1,
+  }
+  const b = {
+    day: 'b',
+    photo: null,
+    weight: 72.1,
+    fat: 36.8,
+    muscle: null,
+    water: null,
+    visceral: 6,
+    bmi: 26,
+  }
   expect(compareDeltas(a, b)).toEqual([
     { key: 'weight', label: 'Peso', text: '↑ 5.3 kg' },
     { key: 'fat', label: 'Grasa', text: '↑ 5.7 puntos' },
+    { key: 'bmi', label: 'IMC', text: '↑ 1.9' },
   ])
 })

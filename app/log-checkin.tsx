@@ -19,6 +19,7 @@ import { SkyBackground } from '@/features/tabs/components'
 import { todayInTimezone } from '@/lib/time'
 import { colors, typography } from '@/theme'
 import { useWearableWeights } from '@/features/wearables/hooks'
+import { requestBodyCompare } from '@/features/progress/pending-compare'
 
 /*
  * Nueva medición · UN SOLO CANVAS (rediseño v3 · brief dueña 14 jul 2026):
@@ -491,10 +492,10 @@ export default function LogCheckinScreen() {
         // Análisis regresa al tab, no al formulario. Sin medición anterior
         // (o editando), vuelve como siempre.
         if (!editing && previous) {
-          router.replace({
-            pathname: '/progress-analysis',
-            params: { a: previous.measured_on, b: date },
-          })
+          // Antes y ahora con anterior vs nueva (antes: /progress-analysis).
+          requestBodyCompare({ a: previous.measured_on, b: date })
+          router.back()
+          router.navigate('/progress')
         } else {
           router.back()
         }

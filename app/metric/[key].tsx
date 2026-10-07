@@ -26,6 +26,7 @@ import { METRIC_CONFIG, type MetricKey } from '@/features/progress/metric-config
 import { SkyBackground } from '@/features/tabs/components'
 import { todayInTimezone } from '@/lib/time'
 import { colors, typography } from '@/theme'
+import { requestBodyCompare } from '@/features/progress/pending-compare'
 
 /*
  * Detalle por métrica (Epic 08 · F1) — UNA pantalla parametrizada para
@@ -134,7 +135,10 @@ export default function MetricDetailScreen() {
   const openCompare = () => {
     const a = checkinDays[checkinDays.length - 2]
     const b = checkinDays[checkinDays.length - 1]
-    if (a && b) router.push({ pathname: '/progress-analysis', params: { a, b } })
+    if (!a || !b) return
+    requestBodyCompare({ a, b })
+    router.back()
+    router.navigate('/progress')
   }
 
   return (
