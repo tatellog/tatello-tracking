@@ -14,7 +14,6 @@ import { todayInTimezone } from '@/lib/time'
 import {
   deletePhoto,
   getAllWorkoutDates,
-  getBeforeAfterPhotos,
   getBodyCheckins,
   getBodyComposition,
   getLastPeriodStart,
@@ -212,7 +211,7 @@ export function useBodyComposition(rangeDays: number | null = null) {
 
 /** Epic 08 · F1: series por métrica de composición con el MISMO gating de
  *  mock que CompositionCards (con check-ins reales, el mock no se mezcla).
- *  Alimenta /body-composition y /metric/[key]. */
+ *  Alimenta las tarjetas de composición y /metric/[key]. */
 export function useGatedCompositionSeries() {
   const mock = useBodyCompositionIsMock()
   const checkins = useBodyCheckins()
@@ -252,25 +251,6 @@ export function useMeasurements(rangeDays: number | null, enabled = true) {
     queryKey: queryKeys.progress.measurements(rangeDays),
     queryFn: () => (SKIP_AUTH ? buildMockMeasurements(rangeDays) : getMeasurements(rangeDays)),
     enabled,
-  })
-}
-
-/*
- * Lectura: useBeforeAfterPhotos — el par antes/ahora (frontal) para la
- * página de Progreso. Una foto recién subida desde otra surface
- * (onboarding / settings) aparece vía el invalidate de useTakePhoto;
- * el foco de la app cubre el caso de volver desde background.
- */
-export function useBeforeAfterPhotos(sinceIso?: string | null) {
-  return useQuery({
-    queryKey: queryKeys.photos.beforeAfter(sinceIso ?? null),
-    queryFn: () => getBeforeAfterPhotos(sinceIso ?? null),
-    // No refetchOnMount:'always' — tabs never unmount, so it only fired on
-    // cold start. In-app uploads (useTakePhoto) invalidate photos.all with
-    // refetchType:'all', which is what actually makes a fresh photo appear.
-    // refetchOnWindowFocus covers the app-foreground case.
-    refetchOnWindowFocus: true,
-    staleTime: 30_000,
   })
 }
 

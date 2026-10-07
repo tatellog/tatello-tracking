@@ -90,9 +90,12 @@ export function CompositionCards() {
   const synthesis = useMemo(() => compositionSynthesis(series), [series])
 
   // Fecha de la última medición y su edad en días: la frescura manda.
+  // Solo las series que se muestran como tarjeta: una lectura reciente de otra
+  // métrica no debe fechar números viejos (dueña 7 oct 2026, "octubre 2026"
+  // sobre una grasa de agosto 2025).
   const last = useMemo(() => {
-    const lastDay = Object.values(series)
-      .flat()
+    const lastDay = cards
+      .flatMap((c) => c.serie)
       .reduce<string | null>((acc, p) => (acc == null || p.day > acc ? p.day : acc), null)
     if (!lastDay) return null
     const [y, m, d] = lastDay.split('-').map(Number) as [number, number, number]
@@ -102,6 +105,8 @@ export function CompositionCards() {
     )
     const label = `${MESES_LARGO[m - 1]} ${y}`
     return { day: lastDay, ageDays, label }
+    // cards se deriva de series (mismo render).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [series])
 
   // Con la medición vieja, el veredicto en presente se calla (la usuaria se
@@ -234,6 +239,7 @@ function MetricCard({
         ) : null}
         <Text style={styles.curr}>{fmt(last.value, unit)}</Text>
       </View>
+      <Text style={styles.cardDate}>{shortDay(last.day)}</Text>
       {delta != null && delta !== 0 ? (
         /* Delta en ORO, no en el hue: monocromo+oro como el comparador (la
            identidad vive en label+sparkline; el cambio es evidencia). */
@@ -251,6 +257,25 @@ function MetricCard({
   )
 }
 
+const MESES_CORTOS = [
+  'ene',
+  'feb',
+  'mar',
+  'abr',
+  'may',
+  'jun',
+  'jul',
+  'ago',
+  'sep',
+  'oct',
+  'nov',
+  'dic',
+]
+/** "15 ago 2025": de cuándo es el número de la tarjeta. */
+function shortDay(iso: string): string {
+  return `${Number(iso.slice(8, 10))} ${MESES_CORTOS[Number(iso.slice(5, 7)) - 1]} ${iso.slice(0, 4)}`
+}
+
 /** Cada tarjeta abre su detalle, como en Salud (dueña 7 oct 2026). Masa magra
  *  aún no tiene pantalla de detalle. */
 const DETAIL_KEY: Record<string, string | undefined> = {
@@ -261,6 +286,12 @@ const DETAIL_KEY: Record<string, string | undefined> = {
 
 const styles = StyleSheet.create({
   pressed: { opacity: 0.8 },
+  cardDate: {
+    marginTop: 2,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    color: colors.niebla,
+  },
   // El espacio ES el separador (brief): sin hairline, solo aire.
   divider: { height: 0, marginVertical: 28 },
   eyebrow: { marginBottom: 10 },

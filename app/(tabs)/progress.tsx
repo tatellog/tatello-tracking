@@ -24,7 +24,6 @@ import {
   WeightCard,
   type WeightPeriod,
 } from '@/features/progress/components/WeightCard'
-import { ZonesEvolution } from '@/features/progress/components/ZonesEvolution'
 import { PROGRESS_EVENTS } from '@/features/progress/constants'
 import { ProgressInsightCard } from '@/features/progress/components/ProgressInsightCard'
 import { PROGRESS_BODY_ENABLED } from '@/lib/featureFlags'
@@ -352,8 +351,6 @@ function ProgressBody() {
                       "Capítulo de hoy" + el CTA de registro — el último sabor
                       es futuro, nunca ago-2025. */}
                   <CompositionCards />
-                  {/* F4 · evolución por zona (segmental de los check-ins). */}
-                  <ZonesEvolution />
                   {/* Antes y ahora (dueña 7 oct 2026): historial + fotos +
                       comparador en un solo módulo, estilo Salud. */}
                   <View style={styles.sectionGap} />

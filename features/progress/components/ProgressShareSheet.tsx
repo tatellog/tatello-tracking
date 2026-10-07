@@ -253,7 +253,7 @@ function StageCard({
  *
  * El sheet es genérico: no sabe qué hay DENTRO de las tarjetas, solo
  * posee el chrome (modal, header, tabs, captura → MediaLibrary/Sharing).
- * Los consumidores (BeforeAfterPhotos, TrainingShareCTA) pasan los tabs.
+ * Los consumidores (Antes y ahora, TrainingShareCTA) pasan los tabs.
  */
 export function ProgressShareSheet({
   visible,

@@ -2,7 +2,7 @@ import { colors } from '@/theme'
 
 /*
  * Config de las 6 métricas de composición (Epic 08 · F1) — compartida por
- * /body-composition (cards) y /metric/[key] (detalle). Hue = identidad de la
+ * las tarjetas de composición (Progreso › Cuerpo) y /metric/[key] (detalle). Hue = identidad de la
  * métrica (mismo color suba o baje, nunca verde/rojo).
  *
  * Los explainers son CONTEXTO COTIDIANO (nunca médico/alarmista): visceral e

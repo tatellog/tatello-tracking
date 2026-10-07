@@ -8,8 +8,9 @@ import { useMacroTargets } from '@/features/macros/hooks'
 import { useSignalsHistory } from '@/features/orbit/hooks'
 import { daysInDeficit, detectMonthPatterns } from '@/features/orbit/month-built'
 import { requestOrbitSegment } from '@/features/orbit/pending-segment'
-import { useMeasurements } from '@/features/progress/hooks'
-import { smoothWeightPoints, toWeightPoints } from '@/features/progress/logic'
+import { useBodyCheckins, useMeasurements } from '@/features/progress/hooks'
+import { describeWeightChange, mergeWeightSeries } from '@/features/progress/logic'
+import { useWearableWeights } from '@/features/wearables/hooks'
 import { track } from '@/lib/analytics'
 import { colors, typography } from '@/theme'
 
@@ -51,17 +52,23 @@ export function SynthesisCard() {
   const proteinTarget = targets?.protein_g ?? null
   const calorieTarget = targets?.calories ?? null
 
-  // Peso de la MISMA ventana rodante (independiente del chip de la gráfica),
-  // suavizado a 7 días — la misma vara que usa la sección Tu cuerpo.
+  // Peso de la ventana rodante con la MISMA serie y la misma regla que la
+  // tarjeta de Peso (app + coach + báscula; promedio solo con 4+ registros).
   const measurements = useMeasurements(WINDOW)
+  const checkins = useBodyCheckins()
+  const scale = useWearableWeights()
   const drop = useMemo(() => {
-    const smoothed = smoothWeightPoints(toWeightPoints(measurements.data ?? []))
-    if (smoothed.length < 3) return null
-    const first = smoothed[0]!
-    const last = smoothed[smoothed.length - 1]!
-    const kg = first.weight - last.weight
+    const since = Date.now() - WINDOW * 24 * 60 * 60 * 1000
+    const series = mergeWeightSeries(
+      measurements.data ?? [],
+      checkins.data ?? [],
+      scale.data ?? [],
+    ).filter((p) => p.t >= since)
+    const change = describeWeightChange(series)
+    if (!change || change.n < 3) return null
+    const kg = -change.abs
     return kg >= MIN_DROP_KG ? kg : null
-  }, [measurements.data])
+  }, [measurements.data, checkins.data, scale.data])
 
   const rows = useMemo(() => signals.data ?? [], [signals.data])
   const { lead, deficitDays, sideLabel, focoLabel } = useMemo(() => {
@@ -112,7 +119,7 @@ export function SynthesisCard() {
   const causeLine =
     deficitDays != null
       ? resultLine
-        ? `Tus ${deficitDays} días en déficit lo sostuvieron${sideLabel ? `, sobre todo ${sideLabel}` : ''}.`
+        ? `En esos días: ${deficitDays} en déficit${sideLabel ? `, sobre todo ${sideLabel}` : ''}.`
         : `Estos 30 días: ${deficitDays} días en déficit${sideLabel ? `, sobre todo ${sideLabel}` : ''}.`
       : null
 
