@@ -44,20 +44,18 @@ export function HistoryTrends() {
   )
   if (signals.isLoading) return null
 
-  return (
-    <View style={styles.wrap}>
-      <View>
-        <Text style={styles.range}>{t.range.label}</Text>
-        <Text style={styles.caption}>{`Comparado con ${t.range.prevLabel}`}</Text>
-      </View>
-
-      {t.deficit ? (
+  // Cada tarjeta con su llave; las que mejoraron contra el mes pasado van
+  // primero (target-user: "lo que me motiva lo tengo que descubrir yo").
+  const cards: { key: string; improved: boolean; node: ReactNode }[] = []
+  if (t.deficit) {
+    cards.push({
+      key: 'deficit',
+      improved: t.improved.deficit,
+      node: (
         <TrendCard
-          delay={0}
           icon={<TargetGlyph color={colors.magenta} />}
           title="Déficit"
           color={colors.magenta}
-          right="Días con comida"
           aside={
             <ProgressRing
               pct={t.deficit.denom > 0 ? t.deficit.value / t.deficit.denom : 0}
@@ -68,16 +66,25 @@ export function HistoryTrends() {
             />
           }
           value={t.deficit.value}
-          unit={`de ${t.deficit.denom} días`}
-          prev={t.deficit.prev ? `Antes: ${t.deficit.prev.value} de ${t.deficit.prev.denom}` : null}
+          unit={`de los ${t.deficit.denom} días que registraste comida`}
+          prev={
+            t.deficit.prev
+              ? `El mes pasado: ${t.deficit.prev.value} de ${t.deficit.prev.denom}`
+              : null
+          }
+          improved={t.improved.deficit}
           highlight={t.deficit.highlight}
         />
-      ) : null}
-
+      ),
+    })
+  }
+  cards.push({
+    key: 'logging',
+    improved: t.improved.logging,
+    node: (
       <TrendCard
-        delay={80}
         icon={<CalendarGlyph color={colors.bone} />}
-        title="Registro"
+        title="Comida registrada"
         color={colors.bone}
         right="Ver constancia ›"
         onPress={() => {
@@ -86,40 +93,79 @@ export function HistoryTrends() {
         }}
         value={t.logging.value}
         unit={`de ${t.logging.denom} días`}
-        prev={t.logging.prev != null ? `Antes: ${t.logging.prev} de ${t.logging.denom}` : null}
+        prev={
+          t.logging.prev != null ? `El mes pasado: ${t.logging.prev} de ${t.logging.denom}` : null
+        }
+        improved={t.improved.logging}
         highlight={t.logging.highlight}
       />
-
-      {t.protein ? (
+    ),
+  })
+  if (t.protein) {
+    cards.push({
+      key: 'protein',
+      improved: false,
+      node: (
         <TrendCard
-          delay={160}
           icon={<EggGlyph color={colors.signal.proteina} />}
           title="Proteína"
           color={colors.signal.proteina}
-          right="Promedio al día"
+          right={t.protein.target != null ? `Meta: ${t.protein.target} g` : undefined}
           value={t.protein.avg}
-          unit={`g · en ${t.protein.n} ${t.protein.n === 1 ? 'día' : 'días'}`}
-          prev={t.protein.prevAvg != null ? `Antes: ${t.protein.prevAvg} g` : null}
+          unit="g al día en promedio"
+          prev={t.protein.prevAvg != null ? `El mes pasado: ${t.protein.prevAvg} g` : null}
+          improved={t.protein.prevAvg != null && t.protein.avg > t.protein.prevAvg}
           highlight={
-            t.protein.inTarget != null && t.protein.target != null
-              ? `En tu meta (${t.protein.target} g): ${t.protein.inTarget} de ${t.protein.n} días`
-              : null
+            t.protein.gap != null
+              ? `Te faltan ~${t.protein.gap} g al día para tu meta.`
+              : t.protein.inTarget != null
+                ? `En tu meta ${t.protein.inTarget} de ${t.protein.n} días.`
+                : null
           }
+          note={`De los ${t.protein.n} días que registraste proteína.`}
         />
-      ) : null}
-
+      ),
+    })
+  }
+  cards.push({
+    key: 'workouts',
+    improved: t.improved.workouts,
+    node: (
       <TrendCard
-        delay={240}
         icon={<DumbbellGlyph size={18} color={colors.dimension.mente} />}
         title="Entreno"
         color={colors.dimension.mente}
-        right="Días con entreno"
         value={t.workouts.value}
         unit={`de ${t.workouts.denom} días`}
-        prev={t.workouts.prev != null ? `Antes: ${t.workouts.prev} de ${t.workouts.denom}` : null}
+        prev={
+          t.workouts.prev != null
+            ? `El mes pasado: ${t.workouts.prev} de ${t.workouts.denom}`
+            : null
+        }
+        improved={t.improved.workouts}
         highlight={null}
         footer={<WeekBars weeks={t.workouts.weeks} color={colors.dimension.mente} />}
       />
+    ),
+  })
+  const ordered = [...cards.filter((c) => c.improved), ...cards.filter((c) => !c.improved)]
+
+  return (
+    <View style={styles.wrap}>
+      <View style={styles.head}>
+        <Text style={styles.range}>{t.range.label}</Text>
+        <Text style={styles.caption}>{`Comparado con el mes pasado (${t.range.prevLabel})`}</Text>
+        {t.summary ? (
+          <Animated.Text entering={FadeIn.duration(320)} style={styles.summary}>
+            {t.summary}
+          </Animated.Text>
+        ) : null}
+      </View>
+      {ordered.map((c, i) => (
+        <Animated.View key={c.key} entering={FadeIn.duration(320).delay(i * 80)}>
+          {c.node}
+        </Animated.View>
+      ))}
     </View>
   )
 }
@@ -136,12 +182,13 @@ function TrendCard({
   aside,
   footer,
   onPress,
-  delay,
+  improved,
+  note,
 }: {
   icon: ReactNode
   title: string
   color: string
-  right: string
+  right?: string
   value: number
   unit: string
   prev: string | null
@@ -149,7 +196,10 @@ function TrendCard({
   aside?: ReactNode
   footer?: ReactNode
   onPress?: () => void
-  delay: number
+  /** Mejoró contra el mes pasado: el "mes pasado" va en oro con ↑. */
+  improved?: boolean
+  /** Sobre qué días se calcula (cuando no es obvio). */
+  note?: string
 }) {
   const body = (
     <View style={styles.card}>
@@ -160,7 +210,12 @@ function TrendCard({
             <CountUp value={value} style={styles.value} />
             <Text style={styles.unit}>{unit}</Text>
           </View>
-          {prev ? <Text style={styles.caption}>{prev}</Text> : null}
+          {prev ? (
+            <Text style={[styles.caption, improved && styles.improved]}>
+              {improved ? `↑ ${prev}` : prev}
+            </Text>
+          ) : null}
+          {note ? <Text style={styles.caption}>{note}</Text> : null}
         </View>
         {aside}
       </View>
@@ -169,7 +224,7 @@ function TrendCard({
     </View>
   )
   return (
-    <Animated.View entering={FadeIn.duration(320).delay(delay)}>
+    <View>
       {onPress ? (
         <Pressable
           onPress={onPress}
@@ -181,23 +236,26 @@ function TrendCard({
       ) : (
         body
       )}
-    </Animated.View>
+    </View>
   )
 }
 
 /** Barras de las últimas 4 semanas (días con entreno, de 0 a 7), que crecen. */
 function WeekBars({ weeks, color }: { weeks: { label: string; days: number }[]; color: string }) {
   return (
-    <View style={styles.bars}>
-      {weeks.map((w, i) => (
-        <View key={w.label} style={styles.barCol}>
-          <Text style={styles.barNum}>{w.days}</Text>
-          <View style={styles.barTrack}>
-            <Bar pct={w.days / 7} color={color} delay={300 + i * 80} />
+    <View style={styles.barsWrap}>
+      <Text style={styles.caption}>Días con entreno por semana</Text>
+      <View style={styles.bars}>
+        {weeks.map((w, i) => (
+          <View key={w.label} style={styles.barCol}>
+            <Text style={styles.barNum}>{w.days}</Text>
+            <View style={styles.barTrack}>
+              <Bar pct={w.days / 7} color={color} delay={300 + i * 80} />
+            </View>
+            <Text style={styles.barLabel}>{`del ${w.label}`}</Text>
           </View>
-          <Text style={styles.barLabel}>{w.label}</Text>
-        </View>
-      ))}
+        ))}
+      </View>
     </View>
   )
 }
@@ -214,6 +272,16 @@ function Bar({ pct, color, delay }: { pct: number; color: string; delay: number 
 
 const styles = StyleSheet.create({
   wrap: { gap: 12 },
+  head: { gap: 2 },
+  summary: {
+    marginTop: 8,
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.ui,
+    lineHeight: 20,
+    color: colors.oroSoft,
+  },
+  improved: { color: colors.oroSoft, fontFamily: typography.uiBold },
+  barsWrap: { gap: 8 },
   range: {
     fontFamily: typography.uiBold,
     fontSize: typography.sizes.headingLg,

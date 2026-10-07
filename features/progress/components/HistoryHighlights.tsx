@@ -8,7 +8,11 @@ import { useSignalsHistory } from '@/features/orbit/hooks'
 import { detectMonthPatterns } from '@/features/orbit/month-built'
 import { requestOrbitSegment } from '@/features/orbit/pending-segment'
 import { useBodyCheckins, useMeasurements } from '@/features/progress/hooks'
-import { describeWeightChange, mergeWeightSeries } from '@/features/progress/logic'
+import {
+  MIN_TREND_POINTS,
+  describeWeightChange,
+  mergeWeightSeries,
+} from '@/features/progress/logic'
 import { useWearableWeights } from '@/features/wearables/hooks'
 import { track } from '@/lib/analytics'
 import { colors, typography } from '@/theme'
@@ -70,9 +74,15 @@ export function HistoryHighlights() {
   const foodDays = rows.filter((s) => (s.calories ?? 0) > 0).length
   if (signals.isLoading) return null
 
+  // El peso solo con tendencia real (la misma regla que la tarjeta de Peso):
+  // con pocos pesajes, un salto de días asusta y no dice nada.
   const weightLine =
-    weight && weight.n >= 2
-      ? `Tu peso: ${weight.abs > 0 ? '↑' : weight.abs < 0 ? '↓' : '='} ${Math.abs(weight.abs).toFixed(1)} kg del ${fmtT(weight.fromT)} al ${fmtT(weight.toT)} · ${weight.n} registros`
+    weight && weight.n >= MIN_TREND_POINTS
+      ? `Tu peso: ${weight.abs > 0 ? '↑' : weight.abs < 0 ? '↓' : '='} ${Math.abs(weight.abs).toFixed(1)} kg del ${fmtT(weight.fromT)} al ${fmtT(weight.toT)} (promedio de 7 días, ${weight.n} pesajes)`
+      : null
+  const weighHint =
+    weight && weight.n < MIN_TREND_POINTS
+      ? `Con ${MIN_TREND_POINTS - weight.n} ${MIN_TREND_POINTS - weight.n === 1 ? 'pesaje' : 'pesajes'} más vemos la tendencia real de tu peso.`
       : null
 
   const openDescubre = () => {
@@ -91,9 +101,9 @@ export function HistoryHighlights() {
       />
       <View style={styles.lines}>
         {weightLine ? <Line text={weightLine} /> : null}
-        {lead ? <Line text={lead.title} /> : null}
-        {foco && lead ? <Line text={`Tu foco esta semana: sostener ${foco}.`} strong /> : null}
-        {!weightLine && !lead ? (
+        {weighHint ? <Line text={weighHint} /> : null}
+        {foco ? <Line text={`Tu foco esta semana: sostener ${foco}.`} strong /> : null}
+        {!weightLine && !weighHint && !foco ? (
           <Text style={styles.empty}>
             {foodDays < 7
               ? `Aún no hay patrón: aparece con 7 días o más con comida (llevas ${foodDays}).`

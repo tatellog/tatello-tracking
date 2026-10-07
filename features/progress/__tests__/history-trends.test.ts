@@ -17,7 +17,7 @@ describe('historyTrends · números con denominador', () => {
   test('déficit de tus días con comida, con el lado de la semana', () => {
     const t = historyTrends(cur, ctx)
     expect(t.deficit).toMatchObject({ value: 3, denom: 4, prev: null })
-    expect(t.deficit!.highlight).toBe('2 de 3 fueron entre semana')
+    expect(t.deficit!.highlight).toBe('Tus días en déficit fueron sobre todo entre semana.')
   })
 
   test('"antes" solo con 5+ días con dato', () => {
@@ -34,10 +34,22 @@ describe('historyTrends · números con denominador', () => {
     const t = historyTrends(cur, ctx)
     expect(t.logging).toMatchObject({ value: 4, denom: 30 })
     expect(t.logging.highlight).toContain('(3 días)')
-    expect(t.protein).toMatchObject({ avg: 95, n: 4, inTarget: 1 })
+    expect(t.protein).toMatchObject({ avg: 95, n: 4, inTarget: 1, gap: 25 })
     expect(t.workouts.value).toBe(2)
     expect(t.workouts.weeks).toHaveLength(4)
     expect(t.workouts.weeks[3]!.days).toBe(2)
     expect(t.range.label).toBe('8 sep – 7 oct')
   })
+})
+
+test('summary nombra solo lo que mejoró contra el mes pasado', () => {
+  const prev = [sig('2026-08-20', { calories: 1400 })]
+  const cur = [
+    sig('2026-10-06', { calories: 1300, trained: true }),
+    sig('2026-10-05', { calories: 1400 }),
+  ]
+  const t = historyTrends([...cur, ...prev], ctx)
+  expect(t.improved).toMatchObject({ logging: true, workouts: true })
+  expect(t.summary).toBe('Este mes registraste comida y entrenaste más que el mes pasado.')
+  expect(historyTrends(prev, ctx).summary).toBeNull()
 })

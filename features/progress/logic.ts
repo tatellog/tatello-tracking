@@ -1267,6 +1267,10 @@ const isWeekend = (iso: string) => {
 }
 
 export type HistoryTrends = {
+  /** Una frase de hechos: qué mejoró contra el mes pasado (null si nada). */
+  summary: string | null
+  /** Qué tarjetas mejoraron contra el mes pasado (para ordenarlas y en oro). */
+  improved: { deficit: boolean; logging: boolean; workouts: boolean }
   range: {
     from: string
     to: string
@@ -1288,6 +1292,8 @@ export type HistoryTrends = {
     prevAvg: number | null
     inTarget: number | null
     target: number | null
+    /** Gramos al día que faltan para la meta (null si ya la alcanza o no hay). */
+    gap: number | null
   } | null
   workouts: {
     value: number
@@ -1341,9 +1347,11 @@ export function historyTrends(
           : null,
       highlight:
         hits.length >= 3
-          ? weekday >= hits.length - weekday
-            ? `${weekday} de ${hits.length} fueron entre semana`
-            : `${hits.length - weekday} de ${hits.length} fueron en fin de semana`
+          ? weekday > hits.length - weekday
+            ? 'Tus días en déficit fueron sobre todo entre semana.'
+            : weekday < hits.length - weekday
+              ? 'Tus días en déficit fueron sobre todo en fin de semana.'
+              : 'Tus días en déficit se repartieron entre semana y fin de semana.'
           : null,
     }
   }
@@ -1382,6 +1390,10 @@ export function historyTrends(
               ? curP.filter((s) => (s.protein_g ?? 0) >= ctx.proteinTarget!).length
               : null,
           target: ctx.proteinTarget,
+          gap:
+            ctx.proteinTarget != null && Math.round(avg(curP)) < ctx.proteinTarget
+              ? ctx.proteinTarget - Math.round(avg(curP))
+              : null,
         }
       : null
 
@@ -1403,5 +1415,22 @@ export function historyTrends(
     weeks,
   }
 
-  return { range, deficit, logging, protein, workouts }
+  const improved = {
+    deficit: deficit?.prev != null && deficit.value > deficit.prev.value,
+    logging: logging.prev != null && logging.value > logging.prev,
+    workouts: workouts.prev != null && workouts.value > workouts.prev,
+  }
+  const parts = [
+    improved.logging ? 'registraste comida' : null,
+    improved.workouts ? 'entrenaste' : null,
+  ].filter(Boolean) as string[]
+  const summary =
+    parts.length > 0 || improved.deficit
+      ? `Este mes ${[...parts, improved.deficit ? 'tuviste días en déficit' : null]
+          .filter(Boolean)
+          .join(parts.length + (improved.deficit ? 1 : 0) > 2 ? ', ' : ' y ')
+          .replace(/, ([^,]*)$/, ' y $1')} más que el mes pasado.`
+      : null
+
+  return { summary, improved, range, deficit, logging, protein, workouts }
 }
