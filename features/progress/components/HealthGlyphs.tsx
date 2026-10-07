@@ -280,3 +280,29 @@ export function DumbbellGlyph({ size = 16, color }: { size?: number; color: stri
     </Svg>
   )
 }
+
+/** Calendario (última medición): la palomita se dibuja al aparecer. */
+export function CalendarGlyph({ size = 18, color }: { size?: number; color: string }) {
+  const reduce = useReducedMotion()
+  const p = useSharedValue(reduce ? 1 : 0)
+  useEffect(() => {
+    if (reduce) return
+    p.value = withDelay(200, withTiming(1, { duration: 500, easing: Easing.out(Easing.cubic) }))
+  }, [reduce, p])
+  const check = useAnimatedProps(() => ({ strokeDashoffset: 10 * (1 - p.value) }))
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Rect x={3.5} y={5} width={17} height={15.5} rx={3} stroke={color} strokeWidth={1.8} />
+      <Path d="M3.5 9.5h17M8 3v4M16 3v4" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
+      <AnimatedLine
+        d="M8.8 14.6l2.2 2.2 4.2-4.3"
+        stroke={color}
+        strokeWidth={1.8}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeDasharray="10 10"
+        animatedProps={check}
+      />
+    </Svg>
+  )
+}
