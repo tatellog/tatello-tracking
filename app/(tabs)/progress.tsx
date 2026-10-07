@@ -24,7 +24,6 @@ import {
   WeightCard,
   type WeightPeriod,
 } from '@/features/progress/components/WeightCard'
-import { TransformationHero } from '@/features/progress/components/TransformationHero'
 import { ZonesEvolution } from '@/features/progress/components/ZonesEvolution'
 import { PROGRESS_EVENTS } from '@/features/progress/constants'
 import { ProgressInsightCard } from '@/features/progress/components/ProgressInsightCard'
@@ -254,12 +253,8 @@ function ProgressBody() {
             </>
           ) : (
             <>
-              {/* F2 · hero "Tu transformación": primera marca → hoy con el arco
-                  dorado (peso suavizado). Se auto-oculta con <2 mediciones. */}
-              <TransformationHero />
-              {/* El espacio ES el separador (brief UI polish): en Cuerpo las
-                  secciones respiran sin hairlines. */}
-              <View style={styles.sectionGap} />
+              {/* (El hero "Tu transformación" se retiró el 7 oct 2026: repetía el
+                  último peso y el cambio de la tarjeta de Peso.) */}
 
               {/* ── Body: Tu cuerpo · la tarjeta de Peso estilo Salud (dueña
                   7 oct 2026): último peso con fecha, cambio con su tramo,

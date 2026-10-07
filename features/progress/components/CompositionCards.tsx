@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router'
 import { useMemo, useState } from 'react'
-import { StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeIn } from 'react-native-reanimated'
 
 import { EyebrowLabel } from '@/components/EyebrowLabel'
@@ -166,7 +166,23 @@ export function CompositionCards() {
                 entering={FadeIn.duration(420).delay(i * 60)}
                 style={styles.gridItem}
               >
-                <MetricCard label={c.label} unit={c.unit} hue={c.hue} serie={c.serie} />
+                {DETAIL_KEY[c.key] ? (
+                  <Pressable
+                    onPress={() =>
+                      router.push({
+                        pathname: '/metric/[key]',
+                        params: { key: DETAIL_KEY[c.key]! },
+                      })
+                    }
+                    accessibilityRole="button"
+                    accessibilityLabel={`Ver el detalle de ${c.label}`}
+                    style={({ pressed }) => pressed && styles.pressed}
+                  >
+                    <MetricCard label={c.label} unit={c.unit} hue={c.hue} serie={c.serie} />
+                  </Pressable>
+                ) : (
+                  <MetricCard label={c.label} unit={c.unit} hue={c.hue} serie={c.serie} />
+                )}
               </Animated.View>
             ))}
           </View>
@@ -175,12 +191,6 @@ export function CompositionCards() {
               ? 'Datos de ejemplo · así se verá cuando conectes tu báscula o salud.'
               : 'De tus mediciones y salud conectada. Evidencia, no veredicto.'}
           </Text>
-          {/* Epic 08: el detalle por métrica vive en su pantalla. */}
-          <LinkCta
-            label="Ver en detalle →"
-            onPress={() => router.push('/body-composition')}
-            accessibilityLabel="Ver tu composición a detalle"
-          />
           {isStale ? (
             /* Acción opuesta a navegar: más apagada y separada (uxui). */
             <LinkCta
@@ -241,7 +251,16 @@ function MetricCard({
   )
 }
 
+/** Cada tarjeta abre su detalle, como en Salud (dueña 7 oct 2026). Masa magra
+ *  aún no tiene pantalla de detalle. */
+const DETAIL_KEY: Record<string, string | undefined> = {
+  body_fat_pct: 'grasa',
+  muscle_kg: 'musculo',
+  water_pct: 'agua',
+}
+
 const styles = StyleSheet.create({
+  pressed: { opacity: 0.8 },
   // El espacio ES el separador (brief): sin hairline, solo aire.
   divider: { height: 0, marginVertical: 28 },
   eyebrow: { marginBottom: 10 },

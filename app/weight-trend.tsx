@@ -1,444 +1,312 @@
 import { useRouter } from 'expo-router'
 import { useMemo, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
-import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated'
+import Animated, { FadeIn } from 'react-native-reanimated'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import Svg, { Path } from 'react-native-svg'
 
-import { useCyclePhase } from '@/features/cycle/useCyclePhase'
-import { TrajectoryChart } from '@/features/progress/components/TrajectoryChart'
+import { CountUp } from '@/features/progress/components/CountUp'
+import { HealthCardHeader } from '@/features/progress/components/HealthCardHeader'
+import { ListGlyph, ScaleGlyph } from '@/features/progress/components/HealthGlyphs'
+import { WEIGHT_PERIODS, type WeightPeriod } from '@/features/progress/components/WeightCard'
+import { WeightChart, fmtShortDay } from '@/features/progress/components/WeightChart'
 import { useBodyCheckins, useMeasurements } from '@/features/progress/hooks'
 import {
-  computeDelta,
-  computeTrend,
-  formatTrendCopy,
+  WEIGHT_SOURCE_LABEL,
+  describeWeightChange,
   mergeWeightSeries,
-  recoveryFact,
-  smoothWeightPoints,
-  type Trend,
 } from '@/features/progress/logic'
-import { fourPointStarPath } from '@/features/tabs/components/constellation/geometry/four-point-star-path'
 import { SkyBackground } from '@/features/tabs/components'
-import { colors, typography } from '@/theme'
 import { useWearableWeights } from '@/features/wearables/hooks'
+import { colors, typography } from '@/theme'
 
 /*
- * Tendencia del peso (Epic 08 · F1) — la pregunta de esta pantalla:
- * "¿hacia dónde va mi peso?". Hero calmo (peso actual) → la gráfica ENORME
- * como protagonista → los eventos del camino (hechos fechados, no juicios) →
- * la interpretación del motor como reflexión → UN CTA (comparar).
- *
- * Reusa TODO: TrajectoryChart (el del tab, en grande), la serie fusionada
- * suavizada (una sola verdad de peso), recoveryFact para el evento del pico.
- * Cero detección nueva.
+ * Peso · todos los datos (dueña 7 oct 2026, modelo "Mostrar todos los datos"
+ * de Salud). La tarjeta de Peso en grande: tu último peso real con fecha y
+ * fuente, la gráfica de tus mediciones, el promedio / mínimo / máximo del
+ * periodo (cada uno rotulado) y la lista completa de registros. Sin
+ * proyecciones, sin "momentos" narrados, sin frases.
  */
 
-type Period = '7D' | '30D' | '90D' | 'ALL'
-const PERIOD_DAYS: Record<Period, number | null> = { '7D': 7, '30D': 30, '90D': 90, ALL: null }
-const PERIOD_LABEL: Record<Period, string> = {
-  '7D': '7 días',
-  '30D': '30 días',
-  '90D': '90 días',
-  ALL: 'Todo',
-}
-
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
-const fmtT = (t: number): string => {
+const fmtFull = (t: number): string => {
   const d = new Date(t)
   return `${d.getDate()} ${MESES[d.getMonth()] ?? ''} ${d.getFullYear()}`
 }
-
-/** La reflexión dice las DOS cosas cuando no coinciden: "estable" es el ritmo
- *  de estas semanas y el −5 kg es del periodo; juntas sin contexto se leían
- *  como contradicción. Sin juicio en ninguna dirección. */
-function trendReflection(trend: Trend, periodDelta: number, period: Period): string {
-  if (trend.direction === 'flat' && Math.abs(periodDelta) >= 1) {
-    const kg = Math.abs(periodDelta).toFixed(1)
-    const span = period === 'ALL' ? 'en todo tu camino' : `en ${PERIOD_LABEL[period].toLowerCase()}`
-    return periodDelta < 0
-      ? `${kg} kg menos ${span}, y estas semanas tu peso se sostiene.`
-      : `${kg} kg más ${span}, y estas semanas tu peso se sostiene.`
-  }
-  return formatTrendCopy(trend)
-}
+const LIST_PREVIEW = 12
 
 export default function WeightTrendScreen() {
   const router = useRouter()
   const measurements = useMeasurements(null)
   const checkins = useBodyCheckins()
-  // Báscula (spec wearables §9): rellena los días sin registro propio.
-  const scaleWeights = useWearableWeights()
-  const fused = useMemo(
-    () => mergeWeightSeries(measurements.data ?? [], checkins.data ?? [], scaleWeights.data ?? []),
-    [measurements.data, checkins.data, scaleWeights.data],
+  const scale = useWearableWeights()
+  const [period, setPeriod] = useState<WeightPeriod>('M')
+  const [showAll, setShowAll] = useState(false)
+
+  const all = useMemo(
+    () => mergeWeightSeries(measurements.data ?? [], checkins.data ?? [], scale.data ?? []),
+    [measurements.data, checkins.data, scale.data],
   )
-  // Abre en 90 días cuando alcanzan los registros (dueña 28 sep 2026: "Todo"
-  // con pocos registros en años dibujaba un zigzag que alarmaba). Con menos de
-  // 4 en esa ventana, "Todo" (si no, no habría línea).
-  const [picked, setPicked] = useState<Period | null>(null)
-  const recent90 = fused.filter((p) => p.t >= Date.now() - 90 * 24 * 60 * 60 * 1000).length
-  const period: Period = picked ?? (recent90 >= 4 ? '90D' : 'ALL')
-  const setPeriod = setPicked
   const points = useMemo(() => {
-    const days = PERIOD_DAYS[period]
-    if (days == null) return fused
+    const days = WEIGHT_PERIODS.find((p) => p.key === period)?.days ?? 30
     const since = Date.now() - days * 24 * 60 * 60 * 1000
-    return fused.filter((p) => p.t >= since)
-  }, [fused, period])
-  const smoothed = useMemo(() => smoothWeightPoints(points), [points])
-  const trend = useMemo(() => computeTrend(smoothed), [smoothed])
-  const delta = useMemo(() => computeDelta(smoothed), [smoothed])
+    return all.filter((p) => p.t >= since)
+  }, [all, period])
 
-  // Eventos del camino (siempre sobre la serie COMPLETA, hechos fechados):
-  // primera marca, el pico (si hubo rebote) y hoy.
-  const smoothedAll = useMemo(() => smoothWeightPoints(fused), [fused])
-  const events = useMemo(() => {
-    const first = smoothedAll[0]
-    const last = smoothedAll[smoothedAll.length - 1]
-    if (!first || !last) return []
-    const recovery = recoveryFact(smoothedAll)
-    const out: { key: string; label: string; date: string; value: string; bright?: boolean }[] = [
-      {
-        key: 'first',
-        label: 'Primera marca',
-        date: fmtT(first.t),
-        value: `${first.weight.toFixed(1)} kg`,
-      },
-    ]
-    if (recovery) {
-      const peak = smoothedAll.reduce((a, b) => (b.weight > a.weight ? b : a), first)
-      out.push({
-        key: 'peak',
-        label: 'El pico',
-        date: fmtT(peak.t),
-        value: `${recovery.peakKg.toFixed(1)} kg`,
-      })
-    }
-    out.push({
-      key: 'today',
-      label: 'Hoy',
-      date: fmtT(last.t),
-      value: `${last.weight.toFixed(1)} kg`,
-      bright: true,
-    })
-    return out
-  }, [smoothedAll])
-
-  const cycle = useCyclePhase()
-  const last = smoothed[smoothed.length - 1]
-  const isPending = measurements.isPending || checkins.isPending
-
-  // CTA comparar: solo con ≥2 check-ins (el análisis compara mediciones).
-  const checkinDays = (checkins.data ?? []).map((c) => c.measured_on)
-  const canCompare = checkinDays.length >= 2
-  const openCompare = () => {
-    const a = checkinDays[checkinDays.length - 2]
-    const b = checkinDays[checkinDays.length - 1]
-    if (a && b) router.push({ pathname: '/progress-analysis', params: { a, b } })
-  }
+  const latest = all[all.length - 1] ?? null
+  const change = describeWeightChange(points)
+  const stats = useMemo(() => {
+    if (points.length === 0) return null
+    const avg = points.reduce((a, p) => a + p.weight, 0) / points.length
+    const min = points.reduce((a, p) => (p.weight < a.weight ? p : a))
+    const max = points.reduce((a, p) => (p.weight > a.weight ? p : a))
+    return { avg, min, max }
+  }, [points])
+  const newestFirst = [...all].reverse()
+  const listed = showAll ? newestFirst : newestFirst.slice(0, LIST_PREVIEW)
 
   return (
     <View style={styles.screen}>
       <SkyBackground />
-      <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.title}>Tendencia del peso</Text>
-            <Text style={styles.sub}>Hacia dónde va, sin el ruido del día</Text>
-          </View>
+      <SafeAreaView style={styles.flex} edges={['top']}>
+        <View style={styles.topBar}>
+          <Text style={styles.screenTitle}>Peso</Text>
           <Pressable
             onPress={() => router.back()}
-            hitSlop={12}
             accessibilityRole="button"
             accessibilityLabel="Cerrar"
+            hitSlop={12}
           >
-            <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
-              <Path
-                d="M6 6 L18 18 M18 6 L6 18"
-                stroke={colors.bone}
-                strokeWidth={2.2}
-                strokeLinecap="round"
-              />
-            </Svg>
+            <Text style={styles.close}>✕</Text>
           </Pressable>
         </View>
 
-        {isPending ? (
-          <View style={styles.skeleton}>
-            {Array.from({ length: 4 }, (_, i) => (
-              <View key={i} style={styles.skeletonRow} />
-            ))}
-          </View>
-        ) : smoothed.length < 2 ? (
-          <Text style={styles.empty}>
-            Todavía no hay suficiente camino recorrido para ver hacia dónde vas.
-          </Text>
-        ) : (
-          <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-            {/* Hero calmo: el peso de hoy + su cambio en el periodo. */}
-            <Animated.View entering={FadeInDown.duration(420)} style={styles.hero}>
-              <Text style={styles.heroLabel}>Peso actual</Text>
-              <View style={styles.heroRow}>
-                <Text style={styles.heroNum}>{last?.weight.toFixed(1)}</Text>
-                <Text style={styles.heroUnit}>kg</Text>
-              </View>
-              {delta ? (
-                <Text style={styles.heroDelta}>
-                  {delta.abs < 0 ? '−' : delta.abs > 0 ? '+' : ''}
-                  {Math.abs(delta.abs).toFixed(1)} kg · {PERIOD_LABEL[period].toLowerCase()}
-                </Text>
-              ) : null}
-            </Animated.View>
-
-            {/* La protagonista: la gráfica, enorme. */}
-            <Animated.View entering={FadeIn.duration(420).delay(120)}>
-              <TrajectoryChart points={smoothed} trend={trend} height={250} variant="area" />
-              <Text style={styles.chartCaption}>
-                {points.length} {points.length === 1 ? 'registro' : 'registros'} · media de 7 días
-              </Text>
-            </Animated.View>
-
-            {/* Selector de periodo. */}
-            <View style={styles.periodPill}>
-              {(Object.keys(PERIOD_DAYS) as Period[]).map((p) => {
-                const on = p === period
-                return (
-                  <Pressable
-                    key={p}
-                    onPress={() => setPeriod(p)}
-                    style={[styles.periodSeg, on && styles.periodSegOn]}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: on }}
-                  >
-                    <Text style={[styles.periodLabel, on && styles.periodLabelOn]}>
-                      {PERIOD_LABEL[p]}
-                    </Text>
-                  </Pressable>
-                )
-              })}
-            </View>
-
-            {/* Los eventos del camino: hechos fechados, cada uno una estrella. */}
-            <View style={styles.events}>
-              <Text style={styles.eventsTitle}>Los momentos de tu camino</Text>
-              {events.map((e) => (
-                <View key={e.key} style={styles.eventRow}>
-                  <Svg width={18} height={18} viewBox="0 0 18 18">
-                    <Path
-                      d={fourPointStarPath(9, 9, e.bright ? 6 : 4.5)}
-                      fill={e.bright ? colors.oroLeche : colors.oroSoft}
-                      opacity={e.bright ? 1 : 0.8}
-                    />
-                  </Svg>
-                  <View style={styles.eventMain}>
-                    <Text style={styles.eventLabel}>{e.label}</Text>
-                    <Text style={styles.eventDate}>{e.date}</Text>
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          {latest == null ? (
+            <Text style={styles.empty}>Aún no hay registros de peso.</Text>
+          ) : (
+            <>
+              <Animated.View entering={FadeIn.duration(320)} style={styles.card}>
+                <HealthCardHeader
+                  icon={<ScaleGlyph color={colors.magenta} />}
+                  title="Último registro"
+                  color={colors.magenta}
+                  right={`${fmtShortDay(latest.t)}${latest.source ? ` · ${WEIGHT_SOURCE_LABEL[latest.source]}` : ''}`}
+                />
+                <View style={styles.numbers}>
+                  <View style={styles.valueRow}>
+                    <CountUp value={latest.weight} decimals={1} style={styles.value} />
+                    <Text style={styles.unit}>kg</Text>
                   </View>
-                  <Text style={[styles.eventValue, e.bright && styles.eventValueBright]}>
-                    {e.value}
-                  </Text>
+                  {change ? (
+                    <View style={styles.changeCol}>
+                      <Text style={styles.change}>
+                        {`${change.abs > 0 ? '↑' : change.abs < 0 ? '↓' : '='} ${Math.abs(change.abs).toFixed(1)} kg`}
+                      </Text>
+                      <Text style={styles.caption}>{`desde el ${fmtShortDay(change.fromT)}`}</Text>
+                    </View>
+                  ) : null}
                 </View>
-              ))}
-            </View>
 
-            {/* La interpretación, como reflexión (motor, sin ✦). */}
-            {trend ? (
-              <Text style={styles.reflection}>
-                {trendReflection(trend, delta?.abs ?? 0, period)}
-              </Text>
-            ) : null}
-            {cycle && (cycle.phase === 'lutea' || cycle.phase === 'menstrual') ? (
-              <Text style={styles.cycleNote}>
-                {cycle.phase === 'lutea'
-                  ? 'La semana antes de tu período el cuerpo retiene agua. Lo que ves en la balanza no es lo que eres.'
-                  : 'Estás menstruando: el peso se mueve por agua, no por grasa.'}
-              </Text>
-            ) : null}
+                <View style={styles.periods}>
+                  {WEIGHT_PERIODS.map((p) => {
+                    const on = p.key === period
+                    return (
+                      <Pressable
+                        key={p.key}
+                        onPress={() => setPeriod(p.key)}
+                        accessibilityRole="button"
+                        accessibilityLabel={p.a11y}
+                        accessibilityState={{ selected: on }}
+                        style={[styles.periodSeg, on && styles.periodSegOn]}
+                      >
+                        <Text style={[styles.periodText, on && styles.periodTextOn]}>
+                          {p.label}
+                        </Text>
+                      </Pressable>
+                    )
+                  })}
+                </View>
 
-            {/* UN CTA: comparar dos mediciones. */}
-            {canCompare ? (
-              <Pressable
-                onPress={openCompare}
-                accessibilityRole="button"
-                accessibilityLabel="Comparar dos mediciones"
-                style={({ pressed }) => [styles.cta, pressed && { opacity: 0.85 }]}
-              >
-                <Text style={styles.ctaText}>Comparar mis mediciones →</Text>
-              </Pressable>
-            ) : null}
-          </ScrollView>
-        )}
+                {points.length > 0 ? (
+                  <WeightChart points={points} />
+                ) : (
+                  <Text style={styles.empty}>Sin registros en este periodo.</Text>
+                )}
+
+                {stats ? (
+                  <View style={styles.stats}>
+                    <Stat label="Promedio" value={stats.avg} sub={`${points.length} registros`} />
+                    <Stat label="Mínimo" value={stats.min.weight} sub={fmtShortDay(stats.min.t)} />
+                    <Stat label="Máximo" value={stats.max.weight} sub={fmtShortDay(stats.max.t)} />
+                  </View>
+                ) : null}
+              </Animated.View>
+
+              <View style={styles.listHead}>
+                <ListGlyph color={colors.bone} />
+                <Text style={styles.listTitle}>Todos los registros</Text>
+              </View>
+              <View style={styles.list}>
+                {listed.map((p, i) => (
+                  <Animated.View
+                    key={p.t}
+                    entering={FadeIn.duration(240).delay(Math.min(i, 8) * 40)}
+                    style={[styles.row, i > 0 && styles.rowDivider]}
+                  >
+                    <View style={styles.rowText}>
+                      <Text style={styles.rowDate}>{fmtFull(p.t)}</Text>
+                      {p.source ? (
+                        <Text style={styles.caption}>{WEIGHT_SOURCE_LABEL[p.source]}</Text>
+                      ) : null}
+                    </View>
+                    <Text style={styles.rowValue}>{`${p.weight.toFixed(1)} kg`}</Text>
+                  </Animated.View>
+                ))}
+              </View>
+              {newestFirst.length > LIST_PREVIEW ? (
+                <Pressable onPress={() => setShowAll((v) => !v)} accessibilityRole="button">
+                  <Text style={styles.more}>
+                    {showAll ? 'Ver menos' : `Ver todos (${newestFirst.length})`}
+                  </Text>
+                </Pressable>
+              ) : null}
+            </>
+          )}
+        </ScrollView>
       </SafeAreaView>
+    </View>
+  )
+}
+
+function Stat({ label, value, sub }: { label: string; value: number; sub: string }) {
+  return (
+    <View style={styles.stat}>
+      <Text style={styles.statLabel}>{label}</Text>
+      <Text style={styles.statValue}>{`${value.toFixed(1)} kg`}</Text>
+      <Text style={styles.caption}>{sub}</Text>
     </View>
   )
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
-  safe: { flex: 1 },
-  header: {
+  flex: { flex: 1 },
+  topBar: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 6,
+    paddingTop: 12,
+    paddingBottom: 8,
   },
-  title: {
-    fontFamily: typography.displayHeavy,
-    fontSize: typography.sizes.headingLg,
-    color: colors.leche,
-    letterSpacing: -0.5,
-  },
-  sub: {
-    marginTop: 2,
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.body,
-    color: colors.niebla,
-  },
-  skeleton: { paddingHorizontal: 20, paddingTop: 20, gap: 12 },
-  skeletonRow: { height: 44, borderRadius: 12, backgroundColor: colors.bgCard, opacity: 0.6 },
-  empty: {
-    marginTop: 30,
-    paddingHorizontal: 24,
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.bodyLarge,
-    color: colors.bone,
-    textAlign: 'center',
-  },
-  content: { paddingHorizontal: 20, paddingTop: 18, paddingBottom: 48 },
-  hero: { marginBottom: 10 },
-  heroLabel: {
+  screenTitle: {
     fontFamily: typography.uiBold,
-    fontSize: typography.sizes.micro,
-    letterSpacing: 1.4,
-    textTransform: 'uppercase',
-    color: colors.niebla,
-    marginBottom: 2,
+    fontSize: typography.sizes.displaySm,
+    color: colors.leche,
   },
-  heroRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
-  heroNum: {
-    fontFamily: typography.displayHeavy,
+  close: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.headingLg,
+    color: colors.bone,
+  },
+  content: { paddingHorizontal: 20, paddingBottom: 48, gap: 12 },
+  card: { borderRadius: 20, backgroundColor: colors.bgCard, padding: 16, gap: 14 },
+  numbers: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' },
+  valueRow: { flexDirection: 'row', alignItems: 'baseline', gap: 5 },
+  value: {
+    fontFamily: typography.uiBold,
     fontSize: typography.sizes.statHero,
-    letterSpacing: -1,
+    letterSpacing: -1.5,
     color: colors.leche,
     fontVariant: ['tabular-nums'],
-    textShadowColor: 'rgba(252, 246, 235, 0.2)',
-    textShadowRadius: 14,
-    textShadowOffset: { width: 0, height: 0 },
   },
-  heroUnit: {
-    fontFamily: typography.displayMedium,
-    fontSize: typography.sizes.headingLg,
-    color: colors.bone,
-  },
-  heroDelta: {
-    marginTop: 4,
+  unit: { fontFamily: typography.uiBold, fontSize: typography.sizes.bodyLarge, color: colors.bone },
+  changeCol: { alignItems: 'flex-end', gap: 1 },
+  change: {
     fontFamily: typography.uiBold,
-    fontSize: typography.sizes.bodyLarge,
-    color: colors.oroLight,
+    fontSize: typography.sizes.headingLg,
+    color: colors.leche,
     fontVariant: ['tabular-nums'],
   },
-  chartCaption: {
-    marginTop: 4,
+  caption: {
     fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.micro,
+    fontSize: typography.sizes.label,
     color: colors.niebla,
-    letterSpacing: 0.3,
   },
-  periodPill: {
+  periods: {
     flexDirection: 'row',
+    padding: 3,
+    gap: 2,
+    borderRadius: 10,
     backgroundColor: colors.bgCard2,
-    borderWidth: 1,
-    borderColor: colors.bruma,
-    borderRadius: 22,
-    padding: 4,
-    marginTop: 20,
   },
   periodSeg: {
     flex: 1,
-    height: 34,
-    borderRadius: 18,
+    height: 30,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
   periodSegOn: { backgroundColor: colors.magentaTint2 },
-  periodLabel: {
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.micro,
-    color: colors.niebla,
-    letterSpacing: 0.2,
+  periodText: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.label,
+    color: colors.bone,
   },
-  periodLabelOn: { color: colors.magentaHot },
-  // Eventos: hechos fechados con su estrella; "Hoy" brilla.
-  events: { marginTop: 36 },
-  eventsTitle: {
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.smallLabel,
-    letterSpacing: 1.6,
-    textTransform: 'uppercase',
-    color: colors.oroSoft,
-    marginBottom: 10,
+  periodTextOn: { fontFamily: typography.uiBold, color: colors.leche },
+  stats: {
+    flexDirection: 'row',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.hairline,
+    paddingTop: 12,
   },
-  eventRow: {
+  stat: { flex: 1, gap: 2 },
+  statLabel: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.label,
+    color: colors.bone,
+  },
+  statValue: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.heading,
+    color: colors.leche,
+    fontVariant: ['tabular-nums'],
+  },
+  listHead: { marginTop: 12, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  listTitle: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.headingLg,
+    color: colors.leche,
+  },
+  list: { borderRadius: 20, backgroundColor: colors.bgCard, overflow: 'hidden' },
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    paddingVertical: 11,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.05)',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
   },
-  eventMain: { flex: 1 },
-  eventLabel: {
-    fontFamily: typography.uiSemi,
-    fontSize: typography.sizes.ui,
-    color: colors.leche,
-  },
-  eventDate: {
-    marginTop: 1,
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.label,
-    color: colors.niebla,
-    fontVariant: ['tabular-nums'],
-  },
-  eventValue: {
-    fontFamily: typography.uiSemi,
-    fontSize: typography.sizes.ui,
-    color: colors.bone,
-    fontVariant: ['tabular-nums'],
-  },
-  eventValueBright: { fontFamily: typography.uiBold, color: colors.oroLeche },
-  // Reflexión del motor: cita con aire, nunca caption.
-  reflection: {
-    marginTop: 36,
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.title,
-    lineHeight: 25,
-    color: colors.leche,
-  },
-  cycleNote: {
-    marginTop: 16,
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.body,
-    lineHeight: 20,
-    color: colors.niebla,
-  },
-  cta: {
-    marginTop: 36,
-    minHeight: 50,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 14,
-    backgroundColor: colors.magentaTint,
-    borderWidth: 1.5,
-    borderColor: colors.magentaGlow,
-  },
-  ctaText: {
+  rowDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.hairline },
+  rowText: { gap: 2 },
+  rowDate: { fontFamily: typography.uiSemi, fontSize: typography.sizes.ui, color: colors.leche },
+  rowValue: {
     fontFamily: typography.uiBold,
-    fontSize: typography.sizes.label,
-    color: colors.magentaHot,
+    fontSize: typography.sizes.ui,
+    color: colors.leche,
+    fontVariant: ['tabular-nums'],
+  },
+  more: {
+    textAlign: 'center',
+    paddingVertical: 8,
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.body,
+    color: colors.bone,
+  },
+  empty: {
+    paddingVertical: 32,
+    textAlign: 'center',
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    color: colors.niebla,
   },
 })
