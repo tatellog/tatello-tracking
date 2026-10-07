@@ -1234,3 +1234,174 @@ export function compareDeltas(a: CompareEntry, b: CompareEntry): CompareDelta[] 
     out.push({ key: 'bmi', label: 'IMC', text: fmt(b.bmi - a.bmi, '') })
   return out.map((d) => ({ ...d, text: d.text.trim() }))
 }
+
+/* ─── Historia · Tendencias (dueña 7 oct 2026, estilo Fitness) ─────────────
+ *
+ * Una sola cuenta para las tarjetas de Historia. Cada número lleva su
+ * denominador, "día con comida" significa lo mismo en todas (calorías > 0,
+ * la misma vara que daysInDeficit) y "antes" solo se muestra con al menos
+ * MIN_PREV_DAYS días con dato (un promedio de 1 día no es "antes").
+ */
+
+export const MIN_PREV_DAYS = 5
+const MESES_TR = [
+  'ene',
+  'feb',
+  'mar',
+  'abr',
+  'may',
+  'jun',
+  'jul',
+  'ago',
+  'sep',
+  'oct',
+  'nov',
+  'dic',
+]
+const shortIso = (iso: string) =>
+  `${Number(iso.slice(8, 10))} ${MESES_TR[Number(iso.slice(5, 7)) - 1]}`
+const isWeekend = (iso: string) => {
+  const [y, m, d] = iso.split('-').map(Number) as [number, number, number]
+  const wd = new Date(y, m - 1, d, 12).getDay()
+  return wd === 0 || wd === 6
+}
+
+export type HistoryTrends = {
+  range: {
+    from: string
+    to: string
+    prevFrom: string
+    prevTo: string
+    label: string
+    prevLabel: string
+  }
+  deficit: {
+    value: number
+    denom: number
+    prev: { value: number; denom: number } | null
+    highlight: string | null
+  } | null
+  logging: { value: number; denom: number; prev: number | null; highlight: string | null }
+  protein: {
+    avg: number
+    n: number
+    prevAvg: number | null
+    inTarget: number | null
+    target: number | null
+  } | null
+  workouts: {
+    value: number
+    denom: number
+    prev: number | null
+    weeks: { label: string; days: number }[]
+  }
+}
+
+export function historyTrends(
+  signals: readonly DailySignals[],
+  ctx: {
+    today: string
+    calorieTarget: number | null
+    proteinTarget: number | null
+    windowDays?: number
+  },
+): HistoryTrends {
+  const win = ctx.windowDays ?? 30
+  const curStart = shiftIso(ctx.today, -win)
+  const prevStart = shiftIso(ctx.today, -2 * win)
+  const byDay = new Map<string, DailySignals>()
+  for (const s of signals) if (s.day) byDay.set(s.day, s)
+  const cur = [...byDay.values()].filter((s) => s.day! > curStart && s.day! <= ctx.today)
+  const prev = [...byDay.values()].filter((s) => s.day! > prevStart && s.day! <= curStart)
+  const food = (rows: DailySignals[]) => rows.filter((s) => s.calories != null && s.calories > 0)
+  const curFood = food(cur)
+  const prevFood = food(prev)
+
+  const range = {
+    from: shiftIso(curStart, 1),
+    to: ctx.today,
+    prevFrom: shiftIso(prevStart, 1),
+    prevTo: curStart,
+    label: `${shortIso(shiftIso(curStart, 1))} – ${shortIso(ctx.today)}`,
+    prevLabel: `${shortIso(shiftIso(prevStart, 1))} – ${shortIso(curStart)}`,
+  }
+
+  // Déficit: de tus días con comida.
+  let deficit: HistoryTrends['deficit'] = null
+  if (ctx.calorieTarget != null && curFood.length > 0) {
+    const hits = curFood.filter((s) => isDeficitDay(s.calories, ctx.calorieTarget))
+    const prevHits = prevFood.filter((s) => isDeficitDay(s.calories, ctx.calorieTarget))
+    const weekday = hits.filter((s) => !isWeekend(s.day!)).length
+    deficit = {
+      value: hits.length,
+      denom: curFood.length,
+      prev:
+        prevFood.length >= MIN_PREV_DAYS
+          ? { value: prevHits.length, denom: prevFood.length }
+          : null,
+      highlight:
+        hits.length >= 3
+          ? weekday >= hits.length - weekday
+            ? `${weekday} de ${hits.length} fueron entre semana`
+            : `${hits.length - weekday} de ${hits.length} fueron en fin de semana`
+          : null,
+    }
+  }
+
+  // Registro: días con comida de los días del periodo; la semana con más.
+  let best: { start: string; days: number } | null = null
+  for (let k = 0; k < Math.floor(win / 7); k++) {
+    const end = shiftIso(ctx.today, -7 * k)
+    const start = shiftIso(end, -6)
+    const days = curFood.filter((s) => s.day! >= start && s.day! <= end).length
+    if (days > 0 && (!best || days > best.days)) best = { start, days }
+  }
+  const logging = {
+    value: curFood.length,
+    denom: win,
+    prev: prev.length > 0 ? prevFood.length : null,
+    highlight: best
+      ? `Semana con más registro: ${shortIso(best.start)} – ${shortIso(shiftIso(best.start, 6))} (${best.days} ${best.days === 1 ? 'día' : 'días'})`
+      : null,
+  }
+
+  // Proteína: promedio en tus días con proteína registrada.
+  const withP = (rows: DailySignals[]) => rows.filter((s) => s.protein_g != null && s.protein_g > 0)
+  const curP = withP(cur)
+  const prevP = withP(prev)
+  const avg = (rows: DailySignals[]) =>
+    rows.reduce((a, s) => a + (s.protein_g ?? 0), 0) / rows.length
+  const protein =
+    curP.length > 0
+      ? {
+          avg: Math.round(avg(curP)),
+          n: curP.length,
+          prevAvg: prevP.length >= MIN_PREV_DAYS ? Math.round(avg(prevP)) : null,
+          inTarget:
+            ctx.proteinTarget != null
+              ? curP.filter((s) => (s.protein_g ?? 0) >= ctx.proteinTarget!).length
+              : null,
+          target: ctx.proteinTarget,
+        }
+      : null
+
+  // Entreno: días con entreno; barras de las últimas 4 semanas.
+  const trained = (rows: DailySignals[]) => rows.filter((s) => s.trained === true).length
+  const weeks: { label: string; days: number }[] = []
+  for (let k = 3; k >= 0; k--) {
+    const end = shiftIso(ctx.today, -7 * k)
+    const start = shiftIso(end, -6)
+    weeks.push({
+      label: shortIso(start),
+      days: cur.filter((s) => s.day! >= start && s.day! <= end && s.trained === true).length,
+    })
+  }
+  const workouts = {
+    value: trained(cur),
+    denom: win,
+    prev: prev.length > 0 ? trained(prev) : null,
+    weeks,
+  }
+
+  return { range, deficit, logging, protein, workouts }
+}

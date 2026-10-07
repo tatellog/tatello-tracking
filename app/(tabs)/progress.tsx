@@ -15,10 +15,10 @@ import { useProfile } from '@/features/profile/hooks'
 import { BeforeAfterModule } from '@/features/progress/components/BeforeAfterModule'
 import { consumeBodyCompare } from '@/features/progress/pending-compare'
 import { CompositionCards } from '@/features/progress/components/CompositionCards'
-import { HistoryChips } from '@/features/progress/components/HistoryChips'
+import { HistoryHighlights } from '@/features/progress/components/HistoryHighlights'
+import { HistoryTrends } from '@/features/progress/components/HistoryTrends'
 import { AiImportPill } from '@/features/progress/components/AiImportPill'
 import { LinkCta } from '@/features/progress/components/LinkCta'
-import { SynthesisCard } from '@/features/progress/components/SynthesisCard'
 import {
   WEIGHT_PERIODS,
   WeightCard,
@@ -90,10 +90,6 @@ function ProgressBody() {
   const [segment, setSegment] = useState<ProgressSegment>('historia')
   const [period, setPeriod] = useState<WeightPeriod>('M')
 
-  const goBody = () => {
-    track(PROGRESS_EVENTS.body)
-    setSegment('body')
-  }
   const scrollRef = useRef<ScrollView>(null)
   // Al guardar/importar una medición (o desde un detalle), "Antes y ahora"
   // abre con anterior vs nueva: el buzón se consume al enfocar Progreso.
@@ -217,54 +213,18 @@ function ProgressBody() {
 
           {segment === 'historia' ? (
             <>
-              {/* F1 · "Tus últimos 30 días": chips 30v30 con sparklines, driven
-                  por el Comparison Engine (UNA matemática — reemplaza a
-                  TuHistoria, que calculaba su propia ventana). */}
-              <HistoryChips />
+              {/* Historia (dueña 7 oct 2026, propuesta de product): tendencias
+                  estilo Fitness con denominadores y "antes" honesto, luego los
+                  Destacados (un solo enlace a Descubre). Registro abre la
+                  constancia; las fotos viven en Cuerpo. */}
+              <HistoryTrends />
 
               {/* Insight principal + chat guiado (Epic 04). Doble-gateado (flag +
-                  dev) y auto-oculto sin insights — trae su propio divisor. */}
+                  dev) y auto-oculto sin insights. */}
               <ProgressInsightCard />
 
-              {/* (La card de ciclo se fue de Historia: un concepto, un hogar —
-                  el ciclo vive en Hoy, y aquí solo como nota contextual bajo la
-                  gráfica de peso de Cuerpo, donde explica la báscula.) */}
-
-              {/* Las fotos viven en Cuerpo › Antes y ahora (dueña 7 oct 2026:
-                  un solo comparador, con Compartir). */}
-              <View style={styles.divider} />
-              <LinkCta
-                label="Ver tus fotos · Antes y ahora ›"
-                onPress={goBody}
-                accessibilityLabel="Ver tus fotos en Antes y ahora"
-              />
-
-              {/* Síntesis — resultado → causa → qué intentar. CIERRA Historia
-              (peak-end: el último sabor del scroll es la palanca abierta, la
-              razón de volver el domingo — nunca un dato triste). Absorbe la
-              vieja ReadingCard; su link a Órbita es el único saliente del tab.
-              La card del emblema se retiró: su % junto a la báscula se leía
-              como "% de mi meta de peso" (anti-patrón por contexto). */}
-              <View style={styles.divider} />
-              <SynthesisCard />
-
-              {/* Epic 06 · puente al calendario: ver (y editar) los días detrás
-                  de estos números — el cierre único de Historia (dieta de CTAs:
-                  el segmento Cuerpo ya tiene su puerta en el switcher). */}
-              <LinkCta
-                label="Ver tu constancia, día por día →"
-                onPress={() => {
-                  track(PROGRESS_EVENTS.openCalendar)
-                  router.navigate('/movement-calendar')
-                }}
-                accessibilityLabel="Ver tu constancia"
-                style={styles.bridgeLink}
-              />
-
-              {/* (La coda "Tu transformación nunca retrocede" se retiró: suelta
-                  sonaba a frase de taza y para quien rebotó era además falsa
-                  sobre el peso. Vuelve DESPUÉS de beta atada a la Historia de
-                  hitos inmutables, donde cada trofeo la respalda.) */}
+              <View style={styles.sectionGap} />
+              <HistoryHighlights />
             </>
           ) : (
             <>

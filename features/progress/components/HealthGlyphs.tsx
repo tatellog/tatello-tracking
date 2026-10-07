@@ -306,3 +306,28 @@ export function CalendarGlyph({ size = 18, color }: { size?: number; color: stri
     </Svg>
   )
 }
+
+/** Proteína: un huevo que se llena de abajo hacia arriba. */
+export function EggGlyph({ size = 18, color }: { size?: number; color: string }) {
+  const reduce = useReducedMotion()
+  const level = useSharedValue(reduce ? 1 : 0)
+  useEffect(() => {
+    if (reduce) return
+    level.value = withDelay(200, withTiming(1, { duration: 700, easing: Easing.out(Easing.cubic) }))
+  }, [reduce, level])
+  const fill = useAnimatedProps(() => ({ y: 21 - 17 * level.value, height: 17 * level.value }))
+  const egg = 'M12 3.5c3.6 0 6.5 5.4 6.5 9.6a6.5 6.5 0 0 1-13 0c0-4.2 2.9-9.6 6.5-9.6z'
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Defs>
+        <ClipPath id="egg-clip">
+          <Path d={egg} />
+        </ClipPath>
+      </Defs>
+      <G clipPath="url(#egg-clip)">
+        <AnimatedRect x={0} width={24} fill={color} opacity={0.35} animatedProps={fill} />
+      </G>
+      <Path d={egg} stroke={color} strokeWidth={1.8} strokeLinejoin="round" />
+    </Svg>
+  )
+}

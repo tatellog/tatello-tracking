@@ -2,18 +2,14 @@ import { useMemo, useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeIn } from 'react-native-reanimated'
 
-import { useRouter } from 'expo-router'
-
 import { useFindingTranscript } from '@/features/orbit/chat-transcript'
 import type { Finding } from '@/features/orbit/findings'
 import { MonthChatSheet } from '@/features/orbit/components/MonthChatSheet'
-import { requestOrbitSegment } from '@/features/orbit/pending-segment'
 import { useSaveReflection } from '@/features/orbit/reflections'
 import { useSession } from '@/hooks/useSession'
 import { track } from '@/lib/analytics'
 import { AiCta } from '@/components/AiCta'
 import { EyebrowLabel } from '@/components/EyebrowLabel'
-import { LinkCta } from '@/features/progress/components/LinkCta'
 import { aiEnabledForEmail, PROGRESS_CHAT_ENABLED } from '@/lib/featureFlags'
 import { todayInTimezone } from '@/lib/time'
 import { colors, typography } from '@/theme'
@@ -70,17 +66,9 @@ export function ProgressInsightCard() {
   // (clave `progress:<insightId>`) — memoria para futuras conversaciones. No
   // modifica el insight (inmutable).
   const saveReflection = useSaveReflection(today.slice(0, 7))
-  const router = useRouter()
 
   if (!aiOn || !main || !finding) return null
   const ctaLabel = talked ? 'Retomar con Stelar' : 'Hablémoslo con Stelar'
-  // Epic 06 · el puente explícito al PORQUÉ: Progress muestra qué cambió; el
-  // comportamiento que lo acompañó vive en Órbita. Un link, no un duplicado.
-  const goOrbita = () => {
-    track(PROGRESS_EVENTS.openOrbita, { from: 'insight', id: main.id })
-    requestOrbitSegment('mes')
-    router.push('/orbit')
-  }
 
   return (
     <Animated.View entering={FadeIn.duration(360).delay(100)}>
@@ -104,13 +92,7 @@ export function ProgressInsightCard() {
         style={styles.cta}
       />
 
-      {/* El puente al porqué — link callado, no otra card. */}
-      <LinkCta
-        label="El porqué vive en Descubre →"
-        onPress={goOrbita}
-        accessibilityLabel="Entender el porqué en Descubre"
-        style={styles.bridge}
-      />
+      {/* (Un solo puente a Descubre en Historia: vive en Destacados.) */}
 
       <MonthChatSheet
         finding={open ? finding : null}
@@ -135,8 +117,7 @@ const styles = StyleSheet.create({
   divider: { height: 0, marginVertical: 28 },
   eyebrow: { marginBottom: 12 },
   lead: {
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
+    fontFamily: typography.uiBold,
     fontSize: typography.sizes.heading,
     lineHeight: 25,
     color: colors.leche,
