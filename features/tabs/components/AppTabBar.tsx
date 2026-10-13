@@ -28,6 +28,11 @@ const STAR_PATH = 'M12 2 L15.3 8.7 L21.5 12 L15.3 15.3 L12 22 L8.7 15.3 L2.5 12 
 const PILL_HEIGHT = 62
 const FAB_SIZE = 56
 
+/** Alto de la barra SOBRE el safe-area inferior (paddingTop + FAB + su
+ *  micro-label). El alto total en pantalla = esto + max(insets.bottom, 12).
+ *  Lo usan las capas full-screen (RingCelebration) para no escribir encima. */
+export const TAB_BAR_HEIGHT_ABOVE_INSET = 10 + FAB_SIZE + 3 + 16
+
 function StarGlyph({ size }: { size: number }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24">

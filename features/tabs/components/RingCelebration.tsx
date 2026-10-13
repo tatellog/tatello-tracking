@@ -23,9 +23,12 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated'
 
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
+
 import { colors, typography } from '@/theme'
 
 import type { CelebratePayload } from '../celebrate-bus'
+import { TAB_BAR_HEIGHT_ABOVE_INSET } from './AppTabBar'
 
 /*
  * RingCelebration · la celebración de "Entrené" (dueña 30 sep 2026: "algo más
@@ -101,6 +104,13 @@ function buildSparks(seed: number): Sparks {
 }
 
 type Geo = { cx: number; cy: number; r: number; tx: number; ty: number }
+
+/** El texto arranca a 1.18 × radio del centro: fuera del anillo dorado. */
+const CAPTION_RING_GAP = 1.18
+/** Alto máximo del texto (título + subtítulo en una línea cada uno). */
+const CAPTION_MAX_HEIGHT = 72
+/** Aire mínimo entre el texto y la barra de tabs. */
+const CAPTION_BAR_MARGIN = 12
 
 /** Estelas del grupo (tono, edad) en el segundo T. edad: 0 joven · 1 vieja. */
 function drawSparks(path: SkPath, T: number, tone: number, old: number, s: Sparks, g: Geo): void {
@@ -238,6 +248,7 @@ export const RingCelebration = memo(function RingCelebration({
   onDone: () => void
 }) {
   const { width, height } = useWindowDimensions()
+  const insets = useSafeAreaInsets()
   const t = useSharedValue(0)
   const sparks = useMemo(() => buildSparks(playKey * 7919 + 31), [playKey])
   // El emblema se midió en coordenadas de VENTANA; esta capa puede no empezar
@@ -347,6 +358,15 @@ export const RingCelebration = memo(function RingCelebration({
     const o = v < 0.22 ? 0 : v < 0.34 ? (v - 0.22) / 0.12 : v > 0.86 ? (1 - v) / 0.14 : 1
     return { opacity: Math.max(0, o), transform: [{ translateY: (1 - Math.min(1, o)) * 8 }] }
   })
+
+  // El texto va justo bajo el anillo del emblema (de ahí nace la corona), con
+  // tope sobre la barra de tabs: anclado a `bottom: 64` caía ENCIMA de la
+  // barra flotante y se mezclaba con sus íconos (13 oct 2026).
+  const tabBarTop = height - oy - (Math.max(insets.bottom, 12) + TAB_BAR_HEIGHT_ABOVE_INSET)
+  const captionTop = Math.min(
+    g.cy + g.r * CAPTION_RING_GAP,
+    tabBarTop - CAPTION_MAX_HEIGHT - CAPTION_BAR_MARGIN,
+  )
 
   const hole = g.r * 0.92
   const edge = g.r * 1.22
@@ -546,7 +566,10 @@ export const RingCelebration = memo(function RingCelebration({
           </Group>
         </Canvas>
 
-        <Animated.View style={[styles.caption, textStyle]} pointerEvents="none">
+        <Animated.View
+          style={[styles.caption, { top: captionTop }, textStyle]}
+          pointerEvents="none"
+        >
           <Text style={styles.title}>{payload.title}</Text>
           {payload.subtitle ? <Text style={styles.subtitle}>{payload.subtitle}</Text> : null}
         </Animated.View>
@@ -560,7 +583,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 24,
     right: 24,
-    bottom: 64,
     alignItems: 'center',
     gap: 4,
   },
