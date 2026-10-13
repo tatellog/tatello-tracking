@@ -11,8 +11,10 @@ import { isDeficitDay } from './deficit'
  *
  * Mismo criterio que el cierre de Hoy (day-close.ts) y que el calendario de
  * Mes (deficit.ts): déficit sano = consumo dentro de [60% × meta, meta].
- *   · De día (antes de las 20:00) con consumo ≤ meta → "Sigues en déficit":
- *     el día está abierto, es verdad y no juzga.
+ *   · De día (antes de las 20:00) dentro de la franja sana → "Sigues en
+ *     déficit": el día está abierto, es verdad y no juzga. Debajo del piso
+ *     → "Tu día sigue abierto", anillo neutro: un registro a medias no es
+ *     déficit (ST-002, misma regla que "Tu día" de Hoy).
  *   · Desde las 20:00: dentro de la franja sana → "Día en déficit"; bajo el
  *     piso → "poco registrado", NUNCA en color de logro (línea roja: comer
  *     casi nada no se celebra; lo más probable es que falte registrar).
@@ -90,13 +92,21 @@ export function dayVerdict(input: {
 
   const closed = past || hour >= DAY_VERDICT_CLOSE_HOUR
   if (!closed) {
-    return {
-      kind: 'open',
-      title: 'Sigues en déficit',
-      line: 'Tu día sigue abierto. El cierre llega esta noche.',
-      ringTone: 'deficit',
-      cta: null,
-    }
+    return isDeficitDay(consumed, target)
+      ? {
+          kind: 'open',
+          title: 'Sigues en déficit',
+          line: 'Tu día sigue abierto. El cierre llega esta noche.',
+          ringTone: 'deficit',
+          cta: null,
+        }
+      : {
+          kind: 'open',
+          title: 'Tu día sigue abierto',
+          line: 'El cierre llega esta noche.',
+          ringTone: 'incomplete',
+          cta: null,
+        }
   }
 
   if (isDeficitDay(consumed, target)) {

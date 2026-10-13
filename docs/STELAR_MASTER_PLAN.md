@@ -518,6 +518,13 @@ Copy/paste the following into a Claude coding session:
 - **Riesgo / pendiente:** `stelar-insight` debe desplegarse (`supabase functions deploy stelar-insight`) o el `context_hash` del server diverge del cliente (la caché de IA no acierta hasta el deploy; solo afecta cuentas con IA = dev). `avgProtein` sigue promediando parciales (no fue parte de la decisión).
 - **Next recommended ticket:** ST-005 corte 2.
 
+### 2026-10-13 — ST-002 corte 5 (hallado en la validación visual) — rama `master-plan-integrity`
+
+- **As-is:** en el simulador (cuenta dev, 250/1,585 kcal a las 16:55) Descubre decía "Sigues en déficit" con anillo magenta: `features/orbit/day-verdict.ts` afirmaba déficit de día con cualquier consumo ≤ meta (había un test que lo fijaba con 360 kcal).
+- **Cambio:** de día, "Sigues en déficit" solo dentro de la banda sana; debajo del piso → "Tu día sigue abierto" / "El cierre llega esta noche.", anillo neutro (`ringTone: 'incomplete'`, el arco de calorías no se dibuja; la cifra sigue en la leyenda). Test actualizado + caso nuevo en `day-verdict.test.ts`.
+- **Validación visual (iOS, Expo Go, iPhone 15 Pro Max):** Hoy "Tu día sigue abierto." ✓ · Descubre "Tu día sigue abierto" ✓ · Tu constancia: el 13 sin "poco" y fuera de "2 registrados" ✓. Comida de prueba insertada por SQL en la cuenta dev (`notes = 'claude-st002-preview'`) con autorización de la dueña; se borra al terminar.
+- **Tests:** jest 107 / 1305 ✓, tsc ✓, eslint ✓.
+
 ---
 
 ## 11. DECISION LOG — DO NOT SILENTLY REVERSE

@@ -3,12 +3,21 @@ import { DAY_VERDICT_CLOSE_HOUR, dayFocus, dayVerdict } from '../day-verdict'
 const T = 1463 // piso sano = 0.6 × 1463 ≈ 878
 
 describe('dayVerdict', () => {
-  it('de día, con consumo bajo la meta: "Sigues en déficit" (responde la pregunta, sin número)', () => {
-    const v = dayVerdict({ consumedCalories: 360, targetCalories: T, hour: 14 })
+  it('de día, dentro de la franja sana: "Sigues en déficit" (responde la pregunta, sin número)', () => {
+    const v = dayVerdict({ consumedCalories: 1100, targetCalories: T, hour: 14 })
     expect(v.kind).toBe('open')
     expect(v.title).toBe('Sigues en déficit')
     expect(`${v.title} ${v.line}`).not.toMatch(/\d/)
     expect(v.ringTone).toBe('deficit')
+  })
+
+  // ST-002: un registro a medias de día no se afirma como déficit.
+  it('de día, debajo del piso sano: día abierto, anillo neutro, sin "déficit"', () => {
+    const v = dayVerdict({ consumedCalories: 360, targetCalories: T, hour: 14 })
+    expect(v.kind).toBe('open')
+    expect(v.title).toBe('Tu día sigue abierto')
+    expect(`${v.title} ${v.line}`).not.toMatch(/déficit|\d/i)
+    expect(v.ringTone).toBe('incomplete')
   })
 
   it('desde las 20:00 bajo el piso sano: poco registrado, nunca en color de logro', () => {
