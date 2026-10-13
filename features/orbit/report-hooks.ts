@@ -22,6 +22,7 @@ import type { MonthlyReport } from './engine-types'
 import type { FindingsCtx } from './findings'
 import type { PriorReflections } from './reflections'
 import { buildMonthlyReport } from './report'
+import { priorCategoriesFromRow } from './prior-findings'
 
 type Period = 'day' | 'week' | 'month' | 'last30'
 
@@ -66,12 +67,7 @@ async function fetchReportFromServer(
 /* ── Arco de evidencia (V-10) · el reporte ANTERIOR ─────────────────── */
 
 // Del reporte previo solo importan las categorías de sus findings (para el
-// estado "confirmado" por recurrencia); lo demás se ignora.
-const PriorReportSchema = z.object({
-  report: z.object({
-    findings: z.array(z.object({ category: z.string() }).passthrough()),
-  }),
-})
+// estado "confirmado" por recurrencia): priorCategoriesFromRow (prior-findings.ts).
 
 /** Días de separación mínima para que un reporte cuente como "historia":
  *  con ventanas rodantes (last30), un reporte de hace 3 días compartiría
@@ -100,15 +96,13 @@ export function usePriorFindingCategories(params: {
     queryFn: async (): Promise<string[]> => {
       const { data, error } = await supabase
         .from('monthly_reports')
-        .select('report')
+        .select('payload')
         .lt('period_end', cutIso)
         .order('period_end', { ascending: false })
         .limit(1)
         .maybeSingle()
       if (error || data == null) return []
-      const parsed = PriorReportSchema.safeParse(data)
-      if (!parsed.success) return []
-      return [...new Set(parsed.data.report.findings.map((f) => f.category))]
+      return priorCategoriesFromRow(data)
     },
   })
 }
