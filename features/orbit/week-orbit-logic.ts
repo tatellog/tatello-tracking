@@ -1193,7 +1193,8 @@ export function confirmedFacts(
     out.push({ key: 'logged', text: `Registraste ${appeared} de ${total} ${dayWord(total)}.` })
 
   if (ctx.calorieTarget != null && ctx.calorieTarget > 0) {
-    const def = c((s) => isDeficitDay(s.calories, ctx.calorieTarget))
+    // "terminaron": hoy sigue abierto, no cuenta hasta cerrar (ST-002).
+    const def = c((s) => s.day !== todayIso && isDeficitDay(s.calories, ctx.calorieTarget))
     if (def >= 1)
       out.push({
         key: 'deficit',

@@ -1,4 +1,5 @@
 import { dayReading } from '@/features/orbit/day-goal'
+import { isDeficitDay } from '@/features/orbit/deficit'
 
 /*
  * Microlectura post-registro (V-01) — UNA línea del MOTOR tras guardar una
@@ -15,7 +16,9 @@ import { dayReading } from '@/features/orbit/day-goal'
  *   2. Margen del día — mismas palabras y umbrales que Órbita Día (via
  *      dayReading, la fuente única). SOLO en déficit: recién guardada una
  *      comida, "sobre tu objetivo" sería un regaño en el momento de la
- *      recompensa → silencio.
+ *      recompensa → silencio. Y solo dentro de la banda sana (isDeficitDay):
+ *      con el día a medio registrar (debajo del 60% de la meta) "X kcal por
+ *      debajo" leería un registro incompleto como déficit → silencio (ST-002).
  */
 export type MicroReading = { key: 'protein-day' | 'deficit-margin'; text: string }
 
@@ -43,7 +46,11 @@ export function microReading(input: {
   }
 
   const reading = dayReading(input.dayCalories, input.calorieTarget)
-  if (reading.status === 'deficit' && reading.deltaKcal != null) {
+  if (
+    reading.status === 'deficit' &&
+    reading.deltaKcal != null &&
+    isDeficitDay(input.dayCalories, input.calorieTarget)
+  ) {
     return {
       key: 'deficit-margin',
       text: `Tu día va ${reading.deltaKcal} kcal por debajo de tu meta.`,

@@ -25,6 +25,31 @@ describe('buildPeriodContext — nutrición', () => {
     expect(ctx.nutrition.daysLogged).toBe(3)
   })
 
+  // §12 P12 (dueña, 13 oct 2026): el promedio de kcal usa SOLO días completos
+  // (day-quality ≥800) y declara su base en completeDays.
+  it('el promedio de kcal excluye días a medio registrar y declara su base', () => {
+    const signals = [
+      row('2026-07-01', { calories: 1400, meal_count: 3 }), // completo
+      row('2026-07-02', { calories: 1600, meal_count: 3 }), // completo
+      row('2026-07-03', { calories: 300, meal_count: 1 }), // parcial (yogurt suelto)
+    ]
+    const ctx = buildPeriodContext({ period: 'week', signals, calorieTarget: TARGET })
+    expect(ctx.nutrition.avgCalories).toBe(1500)
+    expect(ctx.nutrition.completeDays).toBe(2)
+    // El parcial sigue contando como día registrado (presencia), solo no promedia.
+    expect(ctx.nutrition.daysLogged).toBe(3)
+  })
+
+  it('solo días parciales → sin promedio (dato o silencio)', () => {
+    const ctx = buildPeriodContext({
+      period: 'week',
+      signals: [row('2026-07-01', { calories: 400, meal_count: 1 })],
+      calorieTarget: TARGET,
+    })
+    expect(ctx.nutrition.avgCalories).toBeNull()
+    expect(ctx.nutrition.completeDays).toBe(0)
+  })
+
   it('un día muy bajo el piso NO es déficit NI superávit (línea roja)', () => {
     // 600 < 0.6×1500 = 900 → ni déficit sano ni superávit.
     const ctx = buildPeriodContext({

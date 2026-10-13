@@ -64,7 +64,10 @@ function avgOf(values): number | null {
 }
 function nutritionOf(signals, target) {
   const withFood = signals.filter((s) => (s.meal_count ?? 0) > 0 || (s.calories ?? 0) > 0)
-  const avgCal = avgOf(withFood.map((s) => s.calories))
+  // Promedio SOLO de días completos (≥800 kcal, mismo umbral que
+  // _shared/intelligence/day-quality.ts); base declarada en completeDays.
+  const complete = signals.filter((s) => (s.calories ?? 0) >= 800)
+  const avgCal = avgOf(complete.map((s) => s.calories))
   const avgProt = avgOf(withFood.map((s) => s.protein_g))
   const deficitDays = signals.filter((s) => isDeficitDay(s.calories, target)).length
   const surplusDays =
@@ -73,6 +76,7 @@ function nutritionOf(signals, target) {
       : 0
   return {
     avgCalories: avgCal != null ? round(avgCal) : null,
+    completeDays: complete.length,
     avgProtein: avgProt != null ? round(avgProt) : null,
     deficitDays,
     surplusDays,

@@ -70,6 +70,7 @@ export function MovementCalendarPanel() {
     today: monthsBack === 0 ? today : `${monthKey}-31`,
     calorieTarget,
     firstDataDay,
+    openDay: today,
   })
 
   const [historyDay, setHistoryDay] = useState<CalendarDay | null>(null)

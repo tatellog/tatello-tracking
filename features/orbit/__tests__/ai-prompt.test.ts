@@ -63,7 +63,8 @@ describe('hashContext — fingerprint estable', () => {
       ],
       calorieTarget: 1500,
     })
-    expect(hashContext(ctx)).toBe('ca6173ae')
+    // 13 oct 2026: + nutrition.completeDays (promedio solo de días completos, §12 P12).
+    expect(hashContext(ctx)).toBe('ae7268c8')
   })
 })
 

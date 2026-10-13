@@ -96,6 +96,17 @@ describe('confirmedFacts (§4 · hechos puros)', () => {
     const texts = confirmedFacts(week, WED, { proteinTarget: 130 }).map((o) => o.text)
     expect(texts).toContain('Registraste cada día.')
   })
+
+  // ST-002 · "terminaron en déficit" no puede incluir hoy: sigue abierto.
+  it('hoy en la banda de déficit no cuenta como día que "terminó" en déficit', () => {
+    const week = [
+      mkSig(MON, { calories: 1700, meal_count: 2 }),
+      mkSig(TUE, { calories: 1700, meal_count: 2 }),
+      mkSig(WED, { calories: 1700, meal_count: 2 }), // hoy
+    ]
+    const texts = confirmedFacts(week, WED, CTX).map((o) => o.text)
+    expect(texts).toContain('2 días terminaron en déficit.')
+  })
 })
 
 describe('needsMoreEvidence (§5 · honestidad)', () => {

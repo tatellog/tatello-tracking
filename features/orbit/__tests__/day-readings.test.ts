@@ -97,4 +97,23 @@ describe('buildDayReadings', () => {
   test('cards only appear when they have content', () => {
     expect(buildDayReadings(sig({ trained: true }), CTX).map((c) => c.key)).toEqual(['cuerpo'])
   })
+
+  // ST-002 · día parcial: "En déficit" solo dentro de [60% × meta, meta].
+  test('below the healthy floor → no deficit chip, neutral open-day voice', () => {
+    const c = card(buildDayReadings(sig({ meal_count: 1, calories: 300 }), CTX), 'comida')
+    expect(c?.status).toBeUndefined()
+    expect(c?.coach).not.toMatch(/déficit|dentro de tu objetivo/i)
+    // the honest figure is still there
+    expect(metric(c, 'cal')?.value).toBe('300')
+  })
+
+  test('inside the healthy band → "En déficit"', () => {
+    const c = card(buildDayReadings(sig({ meal_count: 3, calories: 1200 }), CTX), 'comida')
+    expect(c?.status?.text).toBe('En déficit')
+  })
+
+  test('over target keeps "Fuera del déficit"', () => {
+    const c = card(buildDayReadings(sig({ meal_count: 3, calories: 2300 }), CTX), 'comida')
+    expect(c?.status?.text).toBe('Fuera del déficit')
+  })
 })

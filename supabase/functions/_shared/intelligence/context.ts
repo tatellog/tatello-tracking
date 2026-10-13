@@ -14,6 +14,7 @@
  * NOTA pasos: wearable_steps es ingest-only y NO vive en daily_signals (spec
  * wearables §1), así que avgSteps se difiere hasta decidir su superficie.
  */
+import { dayQuality } from './day-quality.ts'
 import { DEFICIT_FLOOR_RATIO, isDeficitDay } from './deficit.ts'
 import type { DailySignals } from './types.ts'
 
@@ -28,7 +29,12 @@ export type ContextPeriod = 'day' | 'week' | 'month' | 'last30'
 export const SLEEP_ENOUGH_MINUTES = 420
 
 export type NutritionContext = {
+  /** Promedio de kcal SOLO de días completos (day-quality.ts): un día a medio
+   *  registrar no baja el promedio ni infla el déficit. Base = `completeDays`
+   *  ("con tus días completos"). Decisión dueña 13 oct 2026 (§12 P12 del plan). */
   avgCalories: number | null
+  /** Días completos (≥800 kcal) — la base declarada de `avgCalories`. */
+  completeDays: number
   avgProtein: number | null
   deficitDays: number
   surplusDays: number
@@ -106,7 +112,8 @@ function nutritionOf(
   target: number | null | undefined,
 ): NutritionContext {
   const withFood = signals.filter((s) => (s.meal_count ?? 0) > 0 || (s.calories ?? 0) > 0)
-  const avgCal = avgOf(withFood.map((s) => s.calories))
+  const complete = signals.filter((s) => dayQuality(s) === 'completo')
+  const avgCal = avgOf(complete.map((s) => s.calories))
   const avgProt = avgOf(withFood.map((s) => s.protein_g))
   const deficitDays = signals.filter((s) => isDeficitDay(s.calories, target)).length
   // Superávit = consumo POR ENCIMA del target (no el complemento de déficit:
@@ -117,6 +124,7 @@ function nutritionOf(
       : 0
   return {
     avgCalories: avgCal != null ? round(avgCal) : null,
+    completeDays: complete.length,
     avgProtein: avgProt != null ? round(avgProt) : null,
     deficitDays,
     surplusDays,

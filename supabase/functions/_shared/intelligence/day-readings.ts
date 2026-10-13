@@ -13,6 +13,7 @@
  *   • Sleep is NOT a goal → a plain figure, no progress bar.
  *   • Rest is valid; no number screams; no countdown.
  */
+import { isDeficitDay } from './deficit.ts'
 import type { DailySignals } from './types.ts'
 
 export type DayTone = 'win' | 'context' | 'over' | 'soft'
@@ -118,12 +119,15 @@ function comida(s: DailySignals, ctx: DayReadingContext): DayCard | null {
 
   if (metrics.length === 0) return null
   // The deficit verdict — the core weight signal, shown clearly. Only when
-  // there's calorie data + a target to judge against.
+  // there's calorie data + a target to judge against. "En déficit" only
+  // inside the healthy band (isDeficitDay, same rule as the close and the
+  // calendar): below the 60% floor the day is half-logged, not a deficit,
+  // so there's no chip at all (ST-002 · data or silence).
   let status: DayCard['status']
+  const inDeficit = isDeficitDay(s.calories, ctx.calorieTarget)
   if (ctx.calorieTarget && ctx.calorieTarget > 0 && (s.calories ?? 0) > 0) {
-    status = over
-      ? { text: 'Fuera del déficit', tone: 'over' }
-      : { text: 'En déficit', tone: 'context' }
+    if (over) status = { text: 'Fuera del déficit', tone: 'over' }
+    else if (inDeficit) status = { text: 'En déficit', tone: 'context' }
   }
   const coach = overFar
     ? 'Hoy el cuerpo pidió más. ¿Algo pasó?'
@@ -131,7 +135,9 @@ function comida(s: DailySignals, ctx: DayReadingContext): DayCard | null {
       ? 'Hoy tu cuerpo tuvo lo que necesitaba.'
       : proteinReached
         ? 'Llegaste a tu proteína.'
-        : 'Vas dentro de tu objetivo hoy.'
+        : inDeficit
+          ? 'Vas dentro de tu objetivo hoy.'
+          : 'Tu día sigue abierto.'
   return { key: 'comida', label: 'Comida', weight: 'hero', status, metrics, coach }
 }
 

@@ -110,7 +110,13 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
 
   const firstDataDay = signals.length > 0 ? signals[0]!.day : null
   const calendar = useMemo(
-    () => monthCalendar(signals, { today, calorieTarget: targets?.calories ?? null, firstDataDay }),
+    () =>
+      monthCalendar(signals, {
+        today,
+        calorieTarget: targets?.calories ?? null,
+        firstDataDay,
+        openDay: today,
+      }),
     [signals, today, targets?.calories, firstDataDay],
   )
   const presence = useMemo(() => presenceSummary(signals), [signals])

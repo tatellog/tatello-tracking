@@ -396,8 +396,14 @@ export function MonthSegment({
     [calendarSignals],
   )
   const glance = useMemo(
-    () => monthCalendar(calendarSignals, { today: calendarToday, calorieTarget, firstDataDay }),
-    [calendarSignals, calendarToday, calorieTarget, firstDataDay],
+    () =>
+      monthCalendar(calendarSignals, {
+        today: calendarToday,
+        calorieTarget,
+        firstDataDay,
+        openDay: today,
+      }),
+    [calendarSignals, calendarToday, calorieTarget, firstDataDay, today],
   )
   // Hasta dónde se puede retroceder: el mes más viejo con registro (en 90d).
   const oldestMonth = useMemo(() => {

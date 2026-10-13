@@ -343,6 +343,11 @@ export function monthCalendar(
      *  clasificarlo "muy bajo" es un falso positivo que se lee como regaño
      *  retroactivo. Ese día se pinta neutro. */
     firstDataDay?: string | null
+    /** El día REAL de hoy, todavía abierto (ST-002 · día parcial). Debajo del
+     *  piso sano ese día va a medio registrar: no se pinta "comiste poco" ni
+     *  entra al denominador "X de Y en déficit" hasta que cierre. Va aparte
+     *  de `today` porque los meses pasados pasan `YYYY-MM-31` como ancla. */
+    openDay?: string | null
   },
 ): MonthCalendar | null {
   const target = opts.calorieTarget ?? null
@@ -369,7 +374,15 @@ export function monthCalendar(
     const s = byDay.get(date)
     const cals = s?.calories ?? null
     let status: DayStatus = 'none'
-    if (!future && cals != null && cals > 0) {
+    // Hoy abierto y debajo del piso: aún no se puede leer (ni "poco" ni
+    // denominador). En la banda o sobre la meta sí se pinta, como en vivo.
+    const openBelowFloor =
+      date === opts.openDay &&
+      cals != null &&
+      cals > 0 &&
+      !isDeficitDay(cals, target) &&
+      cals <= target
+    if (!future && cals != null && cals > 0 && !openBelowFloor) {
       if (isDeficitDay(cals, target)) status = 'deficit'
       else if (cals > target) status = 'surplus'
       // Guard de arranque (5.3): el primer día con datos no se marca "muy

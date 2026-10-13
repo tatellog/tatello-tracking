@@ -144,7 +144,12 @@ export function TrainingShareCTA({ historyMode = false }: { historyMode?: boolea
       if (r.day == null || ((r.meal_count ?? 0) <= 0 && (r.calories ?? 0) <= 0)) continue
       if (firstDataDay == null || r.day < firstDataDay) firstDataDay = r.day
     }
-    const cal = monthCalendar(inMonth, { today: todayIso, calorieTarget, firstDataDay })
+    const cal = monthCalendar(inMonth, {
+      today: todayIso,
+      calorieTarget,
+      firstDataDay,
+      openDay: todayIso,
+    })
     return {
       trainedDates,
       minutes: minutes > 0 ? Math.round(minutes) : null,

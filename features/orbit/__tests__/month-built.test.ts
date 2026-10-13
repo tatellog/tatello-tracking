@@ -651,6 +651,53 @@ describe('monthCalendar', () => {
     expect(cal.days[20]!.status).toBe('none')
   })
 
+  // ST-002 · hoy sigue abierto: un desayuno suelto no es "comiste poco".
+  it('hoy abierto debajo del piso: neutro y fuera del denominador', () => {
+    const signals = [
+      at(1, { meal_count: 2, calories: 1400 }), // déficit
+      at(15, { meal_count: 1, calories: 300 }), // hoy, a medio registrar
+    ]
+    const cal = monthCalendar(signals, { today: TODAY, calorieTarget: 1800, openDay: TODAY })!
+    expect(cal.days[14]!.status).toBe('none')
+    expect(cal.dataDays).toBe(1)
+    expect(cal.deficitDays).toBe(1)
+    expect(cal.hasLow).toBe(false)
+  })
+
+  it('hoy abierto en la banda o sobre la meta sí se pinta, como en vivo', () => {
+    const inBand = monthCalendar([at(15, { meal_count: 2, calories: 1400 })], {
+      today: TODAY,
+      calorieTarget: 1800,
+      openDay: TODAY,
+    })!
+    expect(inBand.days[14]!.status).toBe('deficit')
+    expect(inBand.dataDays).toBe(1)
+    const over = monthCalendar([at(15, { meal_count: 3, calories: 2400 })], {
+      today: TODAY,
+      calorieTarget: 1800,
+      openDay: TODAY,
+    })!
+    expect(over.days[14]!.status).toBe('surplus')
+  })
+
+  it('un día pasado debajo del piso sigue siendo "bajo" (solo hoy es abierto)', () => {
+    const cal = monthCalendar([at(9, { meal_count: 1, calories: 300 })], {
+      today: TODAY,
+      calorieTarget: 1800,
+      openDay: TODAY,
+    })!
+    expect(cal.days[8]!.status).toBe('low')
+  })
+
+  it('mes pasado anclado al 31: openDay real nunca coincide, nada cambia', () => {
+    const cal = monthCalendar([at(30, { meal_count: 1, calories: 300 })], {
+      today: '2026-06-31',
+      calorieTarget: 1800,
+      openDay: '2026-07-04',
+    })!
+    expect(cal.days[29]!.status).toBe('low')
+  })
+
   it('null sin meta de calorías o sin ningún día con comida ni entreno', () => {
     const signals = [at(1, { meal_count: 2, calories: 1400 })]
     expect(monthCalendar(signals, { today: TODAY })).toBeNull()

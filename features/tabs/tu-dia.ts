@@ -1,4 +1,5 @@
 import { dayReading } from '@/features/orbit/day-goal'
+import { isDeficitDay } from '@/features/orbit/deficit'
 
 import { dayCloseCopy, dayCloseVerdict, type DayCloseVerdict } from './day-close'
 
@@ -13,6 +14,9 @@ import { dayCloseCopy, dayCloseVerdict, type DayCloseVerdict } from './day-close
  *   2. Desde las 20:00 con comida → el cierre, con la cifra (day-close.ts).
  *   3. De día con comida → la lectura SIN número: solo estado + una línea.
  *      El déficit no es semáforo intradía; el número llega con el cierre.
+ *      "Vas en déficit" solo dentro de la banda sana [60% × meta, meta]
+ *      (isDeficitDay, la misma regla del cierre y del calendario): debajo
+ *      del piso el día está a medio registrar, no "en déficit" (ST-002).
  *   4. Sin comida registrada → no hay tarjeta (un día sin registro no se
  *      juzga ni se reprocha).
  */
@@ -36,7 +40,7 @@ export type TuDiaModel =
   | {
       kind: 'day'
       eyebrow: string
-      status: 'deficit' | 'over'
+      status: 'deficit' | 'over' | 'open'
       title: string
       line: string
     }
@@ -80,7 +84,7 @@ export function tuDiaModel(input: {
   if (mealCount <= 0) return null
   const r = dayReading(consumedCalories, targetCalories)
   if (r.status === 'incomplete') return null
-  if (r.status === 'deficit') {
+  if (r.status === 'deficit' && isDeficitDay(consumedCalories, targetCalories)) {
     return {
       kind: 'day',
       eyebrow: 'Tu día',
@@ -91,12 +95,13 @@ export function tuDiaModel(input: {
       line: '',
     }
   }
-  // Sobre la meta a media tarde: la tarjeta no calla (desaparecer también
-  // sería un veredicto) pero tampoco juzga — el día sigue abierto.
+  // Sobre la meta a media tarde, o todavía debajo del piso sano (un desayuno
+  // suelto): la tarjeta no calla (desaparecer también sería un veredicto)
+  // pero tampoco juzga ni afirma déficit — el día sigue abierto.
   return {
     kind: 'day',
     eyebrow: 'Tu día',
-    status: 'over',
+    status: r.status === 'over' ? 'over' : 'open',
     title: 'Tu día sigue abierto.',
     line: 'El cierre llega esta noche.',
   }

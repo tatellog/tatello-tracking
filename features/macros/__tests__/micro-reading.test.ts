@@ -63,4 +63,26 @@ describe('microReading — con dato o silencio (V-01)', () => {
       }),
     ).toBeNull()
   })
+
+  // ST-002 · día parcial: un registro corto no se lee como margen de déficit.
+  it('calla con el día debajo del piso sano (registro a medias, no déficit)', () => {
+    const r = microReading({
+      dayProteinG: null,
+      proteinTarget: null,
+      dayCalories: 150,
+      calorieTarget: 1463,
+    })
+    expect(r).toBeNull()
+  })
+
+  it('calla con calorías desconocidas (null ≠ 0)', () => {
+    expect(
+      microReading({
+        dayProteinG: null,
+        proteinTarget: null,
+        dayCalories: null,
+        calorieTarget: 1463,
+      }),
+    ).toBeNull()
+  })
 })

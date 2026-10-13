@@ -63,4 +63,23 @@ describe('tuDiaModel', () => {
     // Y aparece aunque no haya comida ese día: es de la semana cerrada.
     expect(tuDiaModel({ ...base, mealCount: 0, weeklyReadingReady: true })?.kind).toBe('weekly')
   })
+
+  // ST-002 · día parcial: debajo del piso sano (60% de la meta) el día está a
+  // medio registrar, no "en déficit". Misma regla que el cierre y el calendario.
+  it('de día, debajo del piso sano: día abierto, nunca "Vas en déficit"', () => {
+    const m = tuDiaModel({ ...base, consumedCalories: 150, mealCount: 1 })
+    expect(m?.kind).toBe('day')
+    if (m?.kind !== 'day') return
+    expect(m.status).toBe('open')
+    expect(`${m.title} ${m.line}`).not.toMatch(/déficit/i)
+    expect(m.title).not.toMatch(/\d/)
+  })
+
+  it('de día, justo en el piso (60%) sí es déficit; un kcal debajo ya no', () => {
+    const floor = Math.ceil(1546 * 0.6)
+    const at = tuDiaModel({ ...base, consumedCalories: floor })
+    const below = tuDiaModel({ ...base, consumedCalories: floor - 1 })
+    expect(at?.kind === 'day' && at.status).toBe('deficit')
+    expect(below?.kind === 'day' && below.status).toBe('open')
+  })
 })

@@ -56,7 +56,8 @@ export function computeFacts(input: ComputeFactsInput): Fact[] {
   if (daysLogged > 0) {
     push('deficit_days', ctx.nutrition.deficitDays, 'días', daysLogged)
     if (hasTarget) push('surplus_days', ctx.nutrition.surplusDays, 'días', daysLogged)
-    push('avg_calories', ctx.nutrition.avgCalories, 'kcal', daysLogged)
+    // Base declarada: solo días completos (no todos los días con comida).
+    push('avg_calories', ctx.nutrition.avgCalories, 'kcal', ctx.nutrition.completeDays)
     push('avg_protein', ctx.nutrition.avgProtein, 'g', daysLogged)
   }
 
