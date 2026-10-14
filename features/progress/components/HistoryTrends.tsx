@@ -94,7 +94,9 @@ export function HistoryTrends() {
         value={t.logging.value}
         unit={`de ${t.logging.denom} días`}
         prev={
-          t.logging.prev != null ? `El mes pasado: ${t.logging.prev} de ${t.logging.denom}` : null
+          t.logging.prev
+            ? `El mes pasado: ${t.logging.prev.value} de ${t.logging.prev.denom}`
+            : null
         }
         improved={t.improved.logging}
         highlight={t.logging.highlight}
@@ -122,7 +124,7 @@ export function HistoryTrends() {
                 ? `En tu meta ${t.protein.inTarget} de ${t.protein.n} días.`
                 : null
           }
-          note={`De los ${t.protein.n} días que registraste proteína.`}
+          note={`De tus ${t.protein.n} días completos con proteína.`}
         />
       ),
     })
@@ -138,8 +140,8 @@ export function HistoryTrends() {
         value={t.workouts.value}
         unit={`de ${t.workouts.denom} días`}
         prev={
-          t.workouts.prev != null
-            ? `El mes pasado: ${t.workouts.prev} de ${t.workouts.denom}`
+          t.workouts.prev
+            ? `El mes pasado: ${t.workouts.prev.value} de ${t.workouts.prev.denom}`
             : null
         }
         improved={t.improved.workouts}

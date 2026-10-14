@@ -27,6 +27,7 @@ import {
 import { PROGRESS_EVENTS } from '@/features/progress/constants'
 import { ProgressInsightCard } from '@/features/progress/components/ProgressInsightCard'
 import { PROGRESS_BODY_ENABLED } from '@/lib/featureFlags'
+import { todayInTimezone } from '@/lib/time'
 import { useBodyCheckins, useMeasurements } from '@/features/progress/hooks'
 import { mergeWeightSeries } from '@/features/progress/logic'
 import { PrimaryCta, SkyBackground, TabHeader } from '@/features/tabs/components'
@@ -145,6 +146,8 @@ function ProgressBody() {
   const deficitCard = useMemo(() => {
     const summary = daysInDeficit(signals30.data ?? [], {
       calorieTarget: targets?.calories ?? null,
+      // Hoy abierto debajo del piso no baja el "X de Y" (ST-009).
+      openDay: todayInTimezone(),
     })
     if (summary == null || summary.foodLoggedDays < 3) return null
     return { days: summary.deficitDays, of: summary.foodLoggedDays }

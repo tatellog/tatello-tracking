@@ -1,6 +1,7 @@
 import type { BodyMeasurement } from '@/features/brief/api'
 import type { DailySignals } from '@/features/orbit/api'
-import { isDeficitDay } from '@/features/orbit/deficit'
+import { countsForProteinAverage } from '@/features/orbit/day-quality'
+import { isDeficitDay, isOpenBelowFloor } from '@/features/orbit/deficit'
 
 import type { BodyCheckin, BodyComposition, PhotoAngle, TimelinePhoto } from './api'
 import type { HistorySummary, MetricComparison } from './types'
@@ -552,7 +553,8 @@ export function proteinAverageComparison(
   const curStart = shiftIso(ctx.today, -win)
   const prevStart = shiftIso(ctx.today, -2 * win)
   const avg = (rows: DailySignals[]): number | null => {
-    const withP = rows.filter((s) => s.protein_g != null)
+    // Solo días completos (ST-009): la misma base que Historia.
+    const withP = rows.filter(countsForProteinAverage)
     if (withP.length === 0) return null
     return Math.round(withP.reduce((a, s) => a + (s.protein_g as number), 0) / withP.length)
   }
@@ -1241,6 +1243,13 @@ export function compareDeltas(a: CompareEntry, b: CompareEntry): CompareDelta[] 
  * denominador, "día con comida" significa lo mismo en todas (calorías > 0,
  * la misma vara que daysInDeficit) y "antes" solo se muestra con al menos
  * MIN_PREV_DAYS días con dato (un promedio de 1 día no es "antes").
+ *
+ * ST-009 (dueña 14 oct 2026):
+ *   · Los "N de M días" cuentan DESDE QUE EMPEZASTE (tu primer día con datos),
+ *     nunca días anteriores a tu cuenta; hoy entra solo si ya tiene el dato.
+ *   · Hoy abierto debajo del piso no entra al déficit (ST-002).
+ *   · "Más que el mes pasado" compara proporciones, no conteos.
+ *   · La proteína promedia solo días completos (misma regla que P12).
  */
 
 export const MIN_PREV_DAYS = 5
@@ -1285,7 +1294,12 @@ export type HistoryTrends = {
     prev: { value: number; denom: number } | null
     highlight: string | null
   } | null
-  logging: { value: number; denom: number; prev: number | null; highlight: string | null }
+  logging: {
+    value: number
+    denom: number
+    prev: { value: number; denom: number } | null
+    highlight: string | null
+  }
   protein: {
     avg: number
     n: number
@@ -1298,7 +1312,7 @@ export type HistoryTrends = {
   workouts: {
     value: number
     denom: number
-    prev: number | null
+    prev: { value: number; denom: number } | null
     weeks: { label: string; days: number }[]
   }
 }
@@ -1323,6 +1337,20 @@ export function historyTrends(
   const curFood = food(cur)
   const prevFood = food(prev)
 
+  // Desde que empezaste: tu primer día con datos (el más viejo que hay).
+  let firstDay: string | null = null
+  for (const d of byDay.keys()) if (firstDay == null || d < firstDay) firstDay = d
+  /** Días de (from, to] que ya existían para ti. */
+  const elapsed = (from: string, to: string) => {
+    const start = firstDay != null && firstDay > from ? firstDay : shiftIso(from, 1)
+    return start > to ? 0 : daysBetween(start, to) + 1
+  }
+  // Hoy cuenta en el denominador solo si ya tiene el dato (si no, sigue abierto).
+  const yesterday = shiftIso(ctx.today, -1)
+  const curDays = (hasToday: boolean) => elapsed(curStart, yesterday) + (hasToday ? 1 : 0)
+  const prevDays = elapsed(prevStart, curStart)
+  const rate = (v: number, d: number) => (d > 0 ? v / d : 0)
+
   const range = {
     from: shiftIso(curStart, 1),
     to: ctx.today,
@@ -1332,15 +1360,18 @@ export function historyTrends(
     prevLabel: `${shortIso(shiftIso(prevStart, 1))} – ${shortIso(curStart)}`,
   }
 
-  // Déficit: de tus días con comida.
+  // Déficit: de tus días con comida (sin hoy abierto debajo del piso).
   let deficit: HistoryTrends['deficit'] = null
-  if (ctx.calorieTarget != null && curFood.length > 0) {
-    const hits = curFood.filter((s) => isDeficitDay(s.calories, ctx.calorieTarget))
+  const deficitBase = curFood.filter(
+    (s) => !isOpenBelowFloor(s.day, s.calories, ctx.calorieTarget, ctx.today),
+  )
+  if (ctx.calorieTarget != null && deficitBase.length > 0) {
+    const hits = deficitBase.filter((s) => isDeficitDay(s.calories, ctx.calorieTarget))
     const prevHits = prevFood.filter((s) => isDeficitDay(s.calories, ctx.calorieTarget))
     const weekday = hits.filter((s) => !isWeekend(s.day!)).length
     deficit = {
       value: hits.length,
-      denom: curFood.length,
+      denom: deficitBase.length,
       prev:
         prevFood.length >= MIN_PREV_DAYS
           ? { value: prevHits.length, denom: prevFood.length }
@@ -1356,7 +1387,7 @@ export function historyTrends(
     }
   }
 
-  // Registro: días con comida de los días del periodo; la semana con más.
+  // Registro: días con comida de los días que llevas; la semana con más.
   let best: { start: string; days: number } | null = null
   for (let k = 0; k < Math.floor(win / 7); k++) {
     const end = shiftIso(ctx.today, -7 * k)
@@ -1364,17 +1395,18 @@ export function historyTrends(
     const days = curFood.filter((s) => s.day! >= start && s.day! <= end).length
     if (days > 0 && (!best || days > best.days)) best = { start, days }
   }
+  const loggedToday = curFood.some((s) => s.day === ctx.today)
   const logging = {
     value: curFood.length,
-    denom: win,
-    prev: prev.length > 0 ? prevFood.length : null,
+    denom: curDays(loggedToday),
+    prev: prevDays >= MIN_PREV_DAYS ? { value: prevFood.length, denom: prevDays } : null,
     highlight: best
       ? `Semana con más registro: ${shortIso(best.start)} – ${shortIso(shiftIso(best.start, 6))} (${best.days} ${best.days === 1 ? 'día' : 'días'})`
       : null,
   }
 
-  // Proteína: promedio en tus días con proteína registrada.
-  const withP = (rows: DailySignals[]) => rows.filter((s) => s.protein_g != null && s.protein_g > 0)
+  // Proteína: promedio en tus días COMPLETOS con proteína registrada.
+  const withP = (rows: DailySignals[]) => rows.filter(countsForProteinAverage)
   const curP = withP(cur)
   const prevP = withP(prev)
   const avg = (rows: DailySignals[]) =>
@@ -1397,7 +1429,7 @@ export function historyTrends(
         }
       : null
 
-  // Entreno: días con entreno; barras de las últimas 4 semanas.
+  // Entreno: días con entreno de los días que llevas; barras de 4 semanas.
   const trained = (rows: DailySignals[]) => rows.filter((s) => s.trained === true).length
   const weeks: { label: string; days: number }[] = []
   for (let k = 3; k >= 0; k--) {
@@ -1408,17 +1440,26 @@ export function historyTrends(
       days: cur.filter((s) => s.day! >= start && s.day! <= end && s.trained === true).length,
     })
   }
+  const trainedToday = cur.some((s) => s.day === ctx.today && s.trained === true)
   const workouts = {
     value: trained(cur),
-    denom: win,
-    prev: prev.length > 0 ? trained(prev) : null,
+    denom: curDays(trainedToday),
+    prev: prevDays >= MIN_PREV_DAYS ? { value: trained(prev), denom: prevDays } : null,
     weeks,
   }
 
+  // Mejoró = proporción más alta que el mes pasado (contar más días registrados
+  // no es "más déficit").
   const improved = {
-    deficit: deficit?.prev != null && deficit.value > deficit.prev.value,
-    logging: logging.prev != null && logging.value > logging.prev,
-    workouts: workouts.prev != null && workouts.value > workouts.prev,
+    deficit:
+      deficit?.prev != null &&
+      rate(deficit.value, deficit.denom) > rate(deficit.prev.value, deficit.prev.denom),
+    logging:
+      logging.prev != null &&
+      rate(logging.value, logging.denom) > rate(logging.prev.value, logging.prev.denom),
+    workouts:
+      workouts.prev != null &&
+      rate(workouts.value, workouts.denom) > rate(workouts.prev.value, workouts.prev.denom),
   }
   const parts = [
     improved.logging ? 'registraste comida' : null,
@@ -1429,7 +1470,7 @@ export function historyTrends(
       ? `Este mes ${[...parts, improved.deficit ? 'tuviste días en déficit' : null]
           .filter(Boolean)
           .join(parts.length + (improved.deficit ? 1 : 0) > 2 ? ', ' : ' y ')
-          .replace(/, ([^,]*)$/, ' y $1')} más que el mes pasado.`
+          .replace(/, ([^,]*)$/, ' y $1')} más seguido que el mes pasado.`
       : null
 
   return { summary, improved, range, deficit, logging, protein, workouts }

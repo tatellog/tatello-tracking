@@ -925,3 +925,45 @@ describe('combosBornRecently (memoria de la histéresis)', () => {
     expect(winningCombo(withToday, { calorieTarget: TARGET, keep })).toBeTruthy()
   })
 })
+
+/* ST-009 · hoy abierto debajo del piso no entra al "X de Y en déficit" (la
+ * misma regla que el calendario del mes). */
+describe('daysInDeficit · hoy abierto', () => {
+  const T = 2000
+  const base = [
+    mkSig('2026-10-05', { meal_count: 1, calories: 1500 }),
+    mkSig('2026-10-06', { meal_count: 1, calories: 1500 }),
+  ]
+
+  it('debajo del piso, hoy queda fuera hasta que cierre', () => {
+    const d = daysInDeficit([...base, mkSig('2026-10-07', { meal_count: 1, calories: 400 })], {
+      calorieTarget: T,
+      openDay: '2026-10-07',
+    })!
+    expect(d).toMatchObject({ deficitDays: 2, foodLoggedDays: 2 })
+  })
+
+  it('en la banda o sobre la meta, hoy sí cuenta', () => {
+    const inBand = daysInDeficit(
+      [...base, mkSig('2026-10-07', { meal_count: 1, calories: 1500 })],
+      {
+        calorieTarget: T,
+        openDay: '2026-10-07',
+      },
+    )!
+    expect(inBand).toMatchObject({ deficitDays: 3, foodLoggedDays: 3 })
+    const over = daysInDeficit([...base, mkSig('2026-10-07', { meal_count: 1, calories: 2500 })], {
+      calorieTarget: T,
+      openDay: '2026-10-07',
+    })!
+    expect(over).toMatchObject({ deficitDays: 2, foodLoggedDays: 3 })
+  })
+
+  it('un día PASADO debajo del piso sí entra (es "comiste poco", decisión P11)', () => {
+    const d = daysInDeficit([...base, mkSig('2026-10-04', { meal_count: 1, calories: 400 })], {
+      calorieTarget: T,
+      openDay: '2026-10-07',
+    })!
+    expect(d.foodLoggedDays).toBe(3)
+  })
+})

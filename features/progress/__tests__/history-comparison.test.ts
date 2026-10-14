@@ -110,11 +110,12 @@ describe('historySparklines — series semanales para los chips (F1)', () => {
 })
 
 describe('proteinAverageComparison — gramos promedio (lenguaje del coach)', () => {
-  it('promedia solo días con proteína registrada, por ventana', () => {
+  it('promedia solo días completos con proteína registrada, por ventana', () => {
     const signals = [
-      sig(day(1), { protein_g: 120 }),
-      sig(day(3), { protein_g: 100 }), // actual: prom 110
-      sig(day(12), { protein_g: 90 }), // previa: prom 90
+      sig(day(1), { calories: 1500, protein_g: 120 }),
+      sig(day(3), { calories: 1500, protein_g: 100 }), // actual: prom 110
+      sig(day(4), { calories: 400, protein_g: 20 }), // parcial (ST-009): no cuenta
+      sig(day(12), { calories: 1500, protein_g: 90 }), // previa: prom 90
     ]
     const r = proteinAverageComparison(signals, CTX)!
     expect(r.current).toBe(110)

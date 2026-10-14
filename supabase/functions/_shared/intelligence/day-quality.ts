@@ -38,3 +38,10 @@ export function dayQuality(s: Pick<DailySignals, 'calories'>): DayQuality {
   if (kcal <= 0) return 'vacio'
   return kcal >= COMPLETE_DAY_MIN_KCAL ? 'completo' : 'parcial'
 }
+
+/** Base de un PROMEDIO de proteína (ST-009 · dueña 14 oct 2026, la misma regla
+ *  que P12 para kcal): solo días completos con proteína registrada. Un
+ *  desayuno suelto no baja el promedio ni infla "te faltan X g". */
+export function countsForProteinAverage(s: Pick<DailySignals, 'calories' | 'protein_g'>): boolean {
+  return dayQuality(s) === 'completo' && s.protein_g != null && s.protein_g > 0
+}

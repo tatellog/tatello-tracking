@@ -26,3 +26,18 @@ export function isDeficitDay(
   if (calories == null || calories <= 0) return false
   return calories <= target && calories >= target * DEFICIT_FLOOR_RATIO
 }
+
+/** Hoy todavía abierto y debajo del piso (ST-002 · día parcial): va a medio
+ *  registrar, así que no se lee ni entra a ningún denominador "X de Y en
+ *  déficit" hasta que cierre. En la banda o sobre la meta sí cuenta, como en
+ *  vivo. `openDay` = el día real de hoy (null = no hay día abierto). */
+export function isOpenBelowFloor(
+  day: string | null | undefined,
+  calories: number | null | undefined,
+  target: number | null | undefined,
+  openDay: string | null | undefined,
+): boolean {
+  if (openDay == null || day !== openDay) return false
+  if (target == null || target <= 0 || calories == null || calories <= 0) return false
+  return !isDeficitDay(calories, target) && calories <= target
+}

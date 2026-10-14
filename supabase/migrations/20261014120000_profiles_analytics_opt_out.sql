@@ -8,6 +8,8 @@
 -- antes de enviar cualquier evento.
 --
 -- Sin policy nueva: profiles ya filtra select/update por auth.uid() = id.
+--
+-- Revertir: alter table public.profiles drop column if exists analytics_opt_out;
 -- =====================================================================
 
 alter table public.profiles

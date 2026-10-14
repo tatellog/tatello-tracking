@@ -53,7 +53,7 @@ import {
 } from './consistency.ts'
 
 import type { DailySignals } from './types.ts'
-import { DEFICIT_FLOOR_RATIO, isDeficitDay } from './deficit.ts'
+import { DEFICIT_FLOOR_RATIO, isDeficitDay, isOpenBelowFloor } from './deficit.ts'
 // Detección por TIPO de entreno — lógica en _shared/intelligence (fuente de
 // verdad del motor); aquí solo se adapta a las tarjetas de Mes.
 import { workoutTypeDeficitSplit, workoutTypeMix, workoutTypeMixPhrase } from './workout-type.ts'
@@ -177,11 +177,17 @@ export type DeficitSummary = {
  *  calorías o si aún no hay días con comida registrada. */
 export function daysInDeficit(
   signals: readonly DailySignals[],
-  opts: { calorieTarget?: number | null },
+  opts: {
+    calorieTarget?: number | null
+    /** Hoy real: abierto y debajo del piso no entra al "X de Y" (ST-009). */
+    openDay?: string | null
+  },
 ): DeficitSummary | null {
   const target = opts.calorieTarget ?? null
   if (target == null || target <= 0) return null
-  const days = foodDays(signals)
+  const days = foodDays(signals).filter(
+    (s) => !isOpenBelowFloor(s.day, s.calories, target, opts.openDay),
+  )
   if (days.length === 0) return null
   let deficitDays = 0
   let overDays = 0
@@ -377,12 +383,7 @@ export function monthCalendar(
     let status: DayStatus = 'none'
     // Hoy abierto y debajo del piso: aún no se puede leer (ni "poco" ni
     // denominador). En la banda o sobre la meta sí se pinta, como en vivo.
-    const openBelowFloor =
-      date === opts.openDay &&
-      cals != null &&
-      cals > 0 &&
-      !isDeficitDay(cals, target) &&
-      cals <= target
+    const openBelowFloor = isOpenBelowFloor(date, cals, target, opts.openDay)
     if (!future && cals != null && cals > 0 && !openBelowFloor) {
       if (isDeficitDay(cals, target)) status = 'deficit'
       else if (cals > target) status = 'surplus'
@@ -432,6 +433,8 @@ export function monthReveals(
     calorieTarget?: number | null
     proteinTarget?: number | null
     waterGoalGlasses?: number | null
+    /** Hoy real: abierto y debajo del piso no entra a la barra de déficit. */
+    openDay?: string | null
   },
 ): MonthReveals {
   const days = loggedDays(signals)
@@ -439,8 +442,12 @@ export function monthReveals(
   const ct = opts.calorieTarget ?? null
   const pt = opts.proteinTarget ?? null
   const wg = Math.max(1, opts.waterGoalGlasses ?? WATER_GOAL_GLASSES)
+  // Base del déficit: días con comida, sin hoy abierto debajo del piso (ST-009).
+  const deficitBase = foodDays(signals).filter(
+    (s) => !isOpenBelowFloor(s.day, s.calories, ct, opts.openDay),
+  )
   const deficitDays =
-    ct != null && ct > 0 ? foodDays(signals).filter((s) => isDeficitDay(s.calories, ct)).length : 0
+    ct != null && ct > 0 ? deficitBase.filter((s) => isDeficitDay(s.calories, ct)).length : 0
   const foodLogged = days.filter((s) => (s.meal_count ?? 0) > 0).length
   const waterDays = days.filter((s) => (s.water_glasses ?? 0) >= wg).length
 
@@ -448,7 +455,7 @@ export function monthReveals(
   // (registrados de esa dimensión), NUNCA los días del mes — "16 de 30" se
   // leería como "fallaste 14" (culpa). Base de la barra de proporción del hero.
   const presentN = days.length
-  const foodN = foodDays(signals).length
+  const foodN = deficitBase.length
   const sleepLogged = days.filter((s) => s.sleep_minutes != null).length
   const proteinLogged = days.filter((s) => s.protein_g != null).length
   const totalOf: Record<string, number> = {

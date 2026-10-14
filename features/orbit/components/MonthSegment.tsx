@@ -500,7 +500,7 @@ export function MonthSegment({
   // (RevealDaysGrid) dibuja EXACTAMENTE esa ventana → el conteo coincide con los
   // días mostrados, aunque abarque dos meses.
   const reveals = useMemo(
-    () => monthReveals(signals, { calorieTarget, proteinTarget, waterGoalGlasses }),
+    () => monthReveals(signals, { calorieTarget, proteinTarget, waterGoalGlasses, openDay: today }),
     [signals, calorieTarget, proteinTarget, waterGoalGlasses],
   )
   // Tendencia del déficit vs tu mes pasado (Apple Trends, self-only). SOLO al
@@ -532,7 +532,7 @@ export function MonthSegment({
   // que corona el modal de "Déficit constante" (lo que la usuaria pedía como
   // "déficit total", pero como conclusión, no como suma gastable).
   const deficitSummary = useMemo(
-    () => daysInDeficit(signals, { calorieTarget }),
+    () => daysInDeficit(signals, { calorieTarget, openDay: today }),
     [signals, calorieTarget],
   )
   // Dirección del déficit DENTRO del mes (inicio vs final) — la flecha "Trends"
