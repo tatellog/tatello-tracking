@@ -74,6 +74,23 @@ function comboShort(combo: WinningCombo): string {
   return `Tu día fuerte: ${list.charAt(0).toLowerCase()}${list.slice(1)}`
 }
 
+/** La etiqueta del hallazgo ("patron" / "observacion"), la MISMA regla y
+ *  muestra que Descubre. También va en los eventos del recorrido (ST-008). */
+export function discoveryLabel(
+  featured: FeaturedDiscovery,
+  maturityStage: number,
+  signals: readonly DailySignals[],
+  opts: ComboOpts,
+): EvidenceLabel {
+  if (featured.kind === 'surprise')
+    return monthPatternLabel({ kind: 'pattern', sample: featured.surprise.sample }, maturityStage)
+  if (featured.kind === 'combo') {
+    const sample = comboEvidenceSample(featured.combo, comboKcalGap(signals, featured.combo, opts))
+    return monthPatternLabel({ kind: 'pattern', sample }, maturityStage)
+  }
+  return monthPatternLabel(featured.pattern, maturityStage)
+}
+
 /** Lo que dice la fila, con la MISMA etiqueta que Descubre. */
 export function hoyDiscoveryModel(
   featured: FeaturedDiscovery,
@@ -81,28 +98,12 @@ export function hoyDiscoveryModel(
   signals: readonly DailySignals[],
   opts: ComboOpts,
 ): HoyDiscoveryModel {
-  const eyebrowOf = (label: EvidenceLabel) =>
-    label === 'patron' ? 'Nuevo patrón' : 'Nueva observación'
-
-  if (featured.kind === 'surprise') {
-    const s = featured.surprise
-    const label = monthPatternLabel({ kind: 'pattern', sample: s.sample }, maturityStage)
-    return { label, eyebrow: eyebrowOf(label), title: s.short, lookId: s.id }
-  }
-
-  if (featured.kind === 'combo') {
-    const combo = featured.combo
-    const sample = comboEvidenceSample(combo, comboKcalGap(signals, combo, opts))
-    const label = monthPatternLabel({ kind: 'pattern', sample }, maturityStage)
-    return { label, eyebrow: eyebrowOf(label), title: comboShort(combo), lookId: null }
-  }
-
+  const label = discoveryLabel(featured, maturityStage, signals, opts)
+  const eyebrow = label === 'patron' ? 'Nuevo patrón' : 'Nueva observación'
+  if (featured.kind === 'surprise')
+    return { label, eyebrow, title: featured.surprise.short, lookId: featured.surprise.id }
+  if (featured.kind === 'combo')
+    return { label, eyebrow, title: comboShort(featured.combo), lookId: null }
   const p = featured.pattern
-  const label = monthPatternLabel(p, maturityStage)
-  return {
-    label,
-    eyebrow: eyebrowOf(label),
-    title: PATTERN_SHORT[p.id] ?? firstSentence(p.title),
-    lookId: p.id,
-  }
+  return { label, eyebrow, title: PATTERN_SHORT[p.id] ?? firstSentence(p.title), lookId: p.id }
 }

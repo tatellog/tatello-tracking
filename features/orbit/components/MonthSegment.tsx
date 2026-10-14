@@ -79,6 +79,8 @@ import {
 import { StelarModal } from '@/components/ui/StelarModal'
 import { evidenceChip, evidenceLook } from '../evidence-highlight'
 import { consumeOrbitEvidence } from '../pending-segment'
+import type { InsightFrom, InsightTarget } from '../insight-events'
+import { trackInsightOnce, trackInsightOpened } from '../insight-events-store'
 import { weeklyMovementLever } from '../week-orbit-logic'
 import { comboChatHash, comboId, comboToFinding } from '../combo-chat'
 import {
@@ -559,7 +561,13 @@ export function MonthSegment({
   const [surpriseFirst, setSurpriseFirst] = useState(false)
   // Abrir un hallazgo aquí también lo "gasta" en Hoy (deja de asomar allá).
   const hoyDiscovery = useHoyDiscoveryState(seenUid)
-  const openSurprise = (id: string) => {
+  // ST-008 · cada apertura deliberada cuenta, con su origen (Hoy, push o aquí).
+  const trackOpened = (id: string, from: InsightFrom, target: InsightTarget) => {
+    const d = discovery.qualified.find((x) => x.id === id)
+    if (d) trackInsightOpened(discovery.insightMetaOf(d), from, target)
+  }
+  const openSurprise = (id: string, from: InsightFrom = 'descubre') => {
+    trackOpened(id, from, 'surprise_detail')
     hoyDiscovery.markOpened(id)
     setSurpriseFirst(surpriseSeen.isNew(id))
     surpriseSeen.markSeen(id)
@@ -568,7 +576,8 @@ export function MonthSegment({
   // Abrir una evidencia cuenta como visto para el push N9: ese hallazgo no se
   // avisa en 14 días (no se manda lo que ya leíste).
   const qc = useQueryClient()
-  const openEvidence = (p: EvidenceItem) => {
+  const openEvidence = (p: EvidenceItem, from: InsightFrom = 'descubre') => {
+    if (p.id) trackOpened(p.id, from, 'evidence')
     setEvidence(p)
     if (p.id) hoyDiscovery.markOpened(p.id)
     if (seenUid && p.id) {
@@ -582,18 +591,33 @@ export function MonthSegment({
   const evidenceFocused = useIsFocused()
   useEffect(() => {
     if (!evidenceFocused || !discovery.loaded) return
-    const id = consumeOrbitEvidence()
-    if (!id) return
+    const pending = consumeOrbitEvidence()
+    if (!pending) return
+    const { id, from } = pending
     // Desde Hoy (ST-007) o el push N9: se abre EXACTAMENTE ese hallazgo. Un
     // combo no tiene modal propio: su tarjeta ya encabeza el feed.
     if (surprise && id === surprise.id) {
-      openSurprise(id)
+      openSurprise(id, from)
       return
     }
     const p = allPatterns.find((x) => x.id === id)
-    if (p) openEvidence(withEvidence(p))
+    if (p) openEvidence(withEvidence(p), from)
+    else if (id === shownKey) trackOpened(id, from, 'feed_card')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [evidenceFocused, discovery.loaded, allPatterns, surprise])
+  // ST-008 · el protagonista del feed estuvo a la vista: una vez al día.
+  const featuredId = discovery.featured?.id ?? null
+  useEffect(() => {
+    if (!evidenceFocused || !seenUid || !discovery.featured || view === 'month') return
+    trackInsightOnce(
+      seenUid,
+      'insight_presented',
+      discovery.insightMetaOf(discovery.featured),
+      today,
+      'descubre',
+    )
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [evidenceFocused, seenUid, featuredId, view, today])
   // El patrón dominante abre el modal cinemático a pantalla completa (no el panel).
   const [reveal, setReveal] = useState<ComboReveal | null>(null)
   // "✦ Quiero entenderlo": la IA explica el patrón dominante que el motor ya
@@ -886,6 +910,7 @@ export function MonthSegment({
                     talked={comboTalk.transcript != null}
                     onAsk={aiOn && comboFinding ? () => openChat(null) : undefined}
                     onReveal={() => {
+                      if (shownKey) trackOpened(shownKey, 'descubre', 'combo_reveal')
                       const base = comboReveal(combo)
                       setReveal({ ...base, takeaway: comboLever ?? base.takeaway })
                     }}

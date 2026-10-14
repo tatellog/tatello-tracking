@@ -27,6 +27,7 @@ import type { ZodiacSign } from '@/features/tabs/zodiac/types'
 import { mlToLitresLabel, useWaterGoal } from '@/features/water/useWaterGoal'
 import { ConnectionsCard } from '@/features/wearables/components/ConnectionsCard'
 import { NotificationsCard } from '@/features/notifications/components/NotificationsCard'
+import { AnalyticsCard } from '@/features/profile/components/AnalyticsCard'
 import { useSession } from '@/hooks/useSession'
 import { confirmBinary, useConfirm } from '@/lib/confirm'
 import { clearVisitedDayOne } from '@/lib/onboardingFlags'
@@ -367,10 +368,11 @@ function SettingsBody() {
           {/* ── Conexiones y avisos — sin encabezado de sección: la tarjeta de
               Conexiones ya se nombra (dueña 26 sep 2026: el encabezado repetía
               el título). Los avisos se prenden y se cambian aquí mismo, sin
-              abrir otra pantalla. ── */}
+              abrir otra pantalla; igual el uso de la app (ST-008). ── */}
           <Animated.View entering={enter(180)} style={styles.deviceGroup}>
             <ConnectionsCard onPress={openConnections} />
             <NotificationsCard />
+            <AnalyticsCard />
           </Animated.View>
 
           {/* ── Más — la documentación y la salida de tus datos, una fila cada

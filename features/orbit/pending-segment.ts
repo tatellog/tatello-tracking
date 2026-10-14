@@ -22,16 +22,18 @@ export function consumeOrbitSegment(): OrbitSegment | null {
 
 /*
  * Mismo buzón one-shot, para abrir "La evidencia" de un patrón (el tap del
- * push N9 "Nuevo patrón encontrado"). Mes lo consume cuando ya tiene sus
- * patrones calculados.
+ * push N9 "Nuevo patrón encontrado", o la fila de Hoy · ST-007). Mes lo
+ * consume cuando ya tiene sus patrones calculados. `from` viaja para el
+ * evento `insight_opened` (ST-008).
  */
-let pendingEvidence: string | null = null
+type PendingEvidence = { id: string; from: 'hoy' | 'push' }
+let pendingEvidence: PendingEvidence | null = null
 
-export function requestOrbitEvidence(patternId: string): void {
-  pendingEvidence = patternId
+export function requestOrbitEvidence(patternId: string, from: 'hoy' | 'push' = 'push'): void {
+  pendingEvidence = { id: patternId, from }
 }
 
-export function consumeOrbitEvidence(): string | null {
+export function consumeOrbitEvidence(): PendingEvidence | null {
   const p = pendingEvidence
   pendingEvidence = null
   return p

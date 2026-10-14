@@ -72,6 +72,7 @@ import { useFirstStarCeremony } from '@/features/tabs/first-star'
 import { HoyDiscoveryStrip } from '@/features/orbit/components/HoyDiscoveryStrip'
 import { hoyDiscoveryModel, hoyDiscoveryVisible } from '@/features/orbit/hoy-discovery'
 import { useHoyDiscoveryState } from '@/features/orbit/hoy-discovery-store'
+import { trackInsightOnce } from '@/features/orbit/insight-events-store'
 import { requestOrbitEvidence, requestOrbitSegment } from '@/features/orbit/pending-segment'
 import { useFeaturedDiscovery } from '@/features/orbit/useFeaturedDiscovery'
 import { useWaterToday } from '@/features/water/hooks'
@@ -773,6 +774,33 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
     if (featuredId) hoyDiscovery.markShown(featuredId, ctx.date)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [featuredId, ctx.date])
+  // ST-008 · el recorrido de un hallazgo: lo calificado (una vez al día; Hoy
+  // siempre se monta, Descubre no) y la fila presentada con Hoy a la vista.
+  const insightUid = featuredDiscovery.seenUid
+  const qualifiedIds = featuredDiscovery.qualified.map((d) => d.id).join('|')
+  useEffect(() => {
+    if (!insightUid || !featuredDiscovery.loaded) return
+    for (const d of featuredDiscovery.qualified) {
+      trackInsightOnce(
+        insightUid,
+        'insight_eligible',
+        featuredDiscovery.insightMetaOf(d),
+        todayIsoLocal,
+      )
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [insightUid, featuredDiscovery.loaded, qualifiedIds, todayIsoLocal])
+  useEffect(() => {
+    if (!insightUid || !featuredId || !hoyFocused || viewingPast) return
+    trackInsightOnce(
+      insightUid,
+      'insight_presented',
+      featuredDiscovery.insightMetaOf(featuredNow!),
+      todayIsoLocal,
+      'hoy',
+    )
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [insightUid, featuredId, hoyFocused, viewingPast, todayIsoLocal])
   const discovery = discoverySignals.data ? discoveryProgress(discoverySignals.data) : null
   const stardustUid = useSession().session?.user?.id ?? 'anon'
   // Plan de un día (dueña 6 oct 2026): solo en las cuentas del flag por ahora.
@@ -1144,7 +1172,7 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
                   )}
                   onOpen={() => {
                     hoyDiscovery.markOpened(featuredNow!.id)
-                    requestOrbitEvidence(featuredNow!.id)
+                    requestOrbitEvidence(featuredNow!.id, 'hoy')
                     requestOrbitSegment('mes')
                     router.navigate('/(tabs)/orbit')
                   }}

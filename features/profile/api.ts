@@ -111,6 +111,8 @@ export const ProfileUpdateSchema = z
     notification_window: z.enum(NOTIFICATION_WINDOW_VALUES),
     // Ajustes: contar líquidos de las comidas como hidratación (ON default).
     count_liquids_from_meals: z.boolean(),
+    // Ajustes: dejar de compartir el uso de la app (ST-008; activa default).
+    analytics_opt_out: z.boolean(),
   })
   .partial()
 

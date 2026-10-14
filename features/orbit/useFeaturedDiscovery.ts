@@ -25,7 +25,13 @@ import { useSeenCombos } from './combo-seen'
 import { earlyReading } from './early-readings'
 import { useSignalsHistory } from './hooks'
 import { dataMaturity } from './maturity'
-import { featuredOf, pickSupportPatterns, type FeaturedDiscovery } from './featured-discovery'
+import {
+  pickSupportPatterns,
+  qualifiedDiscoveries,
+  type FeaturedDiscovery,
+} from './featured-discovery'
+import { discoveryLabel } from './hoy-discovery'
+import { insightMeta, type InsightMeta } from './insight-events'
 import { detectMonthPatterns, winningCombo } from './month-built'
 import { rankSurprises } from './surprise'
 
@@ -100,7 +106,20 @@ export function useFeaturedDiscovery() {
     [allPatterns, combo],
   )
 
-  const featured: FeaturedDiscovery | null = featuredOf(surprises.hero, combo, supportPatterns)
+  // Lo calificado = lo que el feed muestra, en su orden; el primero protagoniza.
+  const qualified = qualifiedDiscoveries(surprises.hero, combo, supportPatterns)
+  const featured: FeaturedDiscovery | null = qualified[0] ?? null
+  // La metadata de los eventos del recorrido (ST-008): la misma etiqueta que se ve.
+  const insightMetaOf = (d: FeaturedDiscovery): InsightMeta =>
+    insightMeta(
+      d,
+      discoveryLabel(d, maturity.stage, patternSignals, {
+        calorieTarget,
+        proteinTarget,
+        waterGoalGlasses,
+      }),
+      maturity.stage,
+    )
 
   return {
     loaded: longHistory !== undefined,
@@ -117,6 +136,8 @@ export function useFeaturedDiscovery() {
     combo,
     allPatterns,
     supportPatterns,
+    qualified,
     featured,
+    insightMetaOf,
   }
 }

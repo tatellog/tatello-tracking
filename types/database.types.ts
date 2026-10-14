@@ -901,6 +901,7 @@ export type Database = {
       profiles: {
         Row: {
           acquisition_source: string | null
+          analytics_opt_out: boolean
           avatar_path: string | null
           biological_sex: string | null
           count_liquids_from_meals: boolean
@@ -927,6 +928,7 @@ export type Database = {
         }
         Insert: {
           acquisition_source?: string | null
+          analytics_opt_out?: boolean
           avatar_path?: string | null
           biological_sex?: string | null
           count_liquids_from_meals?: boolean
@@ -953,6 +955,7 @@ export type Database = {
         }
         Update: {
           acquisition_source?: string | null
+          analytics_opt_out?: boolean
           avatar_path?: string | null
           biological_sex?: string | null
           count_liquids_from_meals?: boolean

@@ -10,25 +10,40 @@ import type { Json } from '@/types/database.types'
  * (no session, RLS reject, network down, schema drift) is
  * swallowed silently. The is_beta flag is cached per user so we
  * hit the profiles table once per session, not once per event.
+ *
+ * ST-008: también respeta profiles.analytics_opt_out (interruptor de
+ * Ajustes). Apagada = no se envía nada, aunque sea beta.
  */
 
-type BetaCache = { userId: string; isBeta: boolean }
+type BetaCache = { userId: string; isBeta: boolean; optOut: boolean }
 let betaCache: BetaCache | null = null
 
 async function shouldTrack(userId: string): Promise<boolean> {
-  if (betaCache && betaCache.userId === userId) return betaCache.isBeta
+  if (betaCache && betaCache.userId === userId) return betaCache.isBeta && !betaCache.optOut
   try {
-    const { data } = await supabase
+    const full = await supabase
       .from('profiles')
-      .select('is_beta')
+      .select('is_beta, analytics_opt_out')
       .eq('id', userId)
       .maybeSingle()
+    // Sin la columna todavía (build nuevo contra una base sin la migración):
+    // se lee solo is_beta y la analítica sigue como estaba, activa.
+    const data = full.error
+      ? (await supabase.from('profiles').select('is_beta').eq('id', userId).maybeSingle()).data
+      : full.data
     const isBeta = data?.is_beta === true
-    betaCache = { userId, isBeta }
-    return isBeta
+    const optOut = data != null && 'analytics_opt_out' in data && data.analytics_opt_out === true
+    betaCache = { userId, isBeta, optOut }
+    return isBeta && !optOut
   } catch {
     return false
   }
+}
+
+/** El interruptor de Ajustes cambió: aplica desde el siguiente evento, sin
+ *  esperar a que el caché se vuelva a leer. */
+export function setAnalyticsOptOut(userId: string, optOut: boolean): void {
+  if (betaCache && betaCache.userId === userId) betaCache = { ...betaCache, optOut }
 }
 
 export function track(eventName: string, metadata?: Record<string, unknown>): void {

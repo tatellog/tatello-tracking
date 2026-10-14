@@ -40,14 +40,25 @@ export function pickSupportPatterns(
     .slice(0, combo ? 2 : 3)
 }
 
+/** Todo lo que el feed de Descubre muestra como hallazgo, en su orden:
+ *  sorpresa → combo → patrones de apoyo. Es lo "calificado" de ST-008. */
+export function qualifiedDiscoveries(
+  surprise: Surprise | null,
+  combo: WinningCombo | null,
+  support: readonly MonthPattern[],
+): FeaturedDiscovery[] {
+  const out: FeaturedDiscovery[] = []
+  if (surprise) out.push({ kind: 'surprise', id: surprise.id, surprise })
+  if (combo) out.push({ kind: 'combo', id: comboKey(combo.signals.map((x) => x.key)), combo })
+  for (const p of support) out.push({ kind: 'pattern', id: p.id, pattern: p })
+  return out
+}
+
 /** El protagonista, en el orden del feed: sorpresa → combo → primer patrón. */
 export function featuredOf(
   surprise: Surprise | null,
   combo: WinningCombo | null,
   support: readonly MonthPattern[],
 ): FeaturedDiscovery | null {
-  if (surprise) return { kind: 'surprise', id: surprise.id, surprise }
-  if (combo) return { kind: 'combo', id: comboKey(combo.signals.map((x) => x.key)), combo }
-  const p = support[0]
-  return p ? { kind: 'pattern', id: p.id, pattern: p } : null
+  return qualifiedDiscoveries(surprise, combo, support)[0] ?? null
 }
