@@ -3,6 +3,8 @@ export { CelebrationOverlay } from './CelebrationOverlay'
 export { StardustOverlay } from './StardustOverlay'
 export { CoachLine } from './CoachLine'
 export {
+  CHECKIN_LAYOUT_MS,
+  CHIP_HOLD_MS,
   DayCheckIn,
   type DayState,
   RestMessage,

@@ -78,12 +78,13 @@ type Props = {
 
 // Una sola curva de layout para el bloque: los estados se funden en vez de
 // cortarse, y la constelación de abajo se desliza en lugar de brincar.
-const LAYOUT = LinearTransition.duration(220)
+export const CHECKIN_LAYOUT_MS = 220
+const LAYOUT = LinearTransition.duration(CHECKIN_LAYOUT_MS)
 
 // Cuánto se queda visible el chip recién elegido antes de recogerse: sin
 // este hold, el bloque colapsaba en el frame siguiente y la usuaria nunca
 // veía su chip pintarse de magenta.
-const CHIP_HOLD_MS = 450
+export const CHIP_HOLD_MS = 450
 
 type ChipProps = {
   label: string

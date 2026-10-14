@@ -91,6 +91,8 @@ import {
 import { track } from '@/lib/analytics'
 import { HERO_ALIVE_ENABLED, weekdayPlanEnabledForEmail } from '@/lib/featureFlags'
 import {
+  CHECKIN_LAYOUT_MS,
+  CHIP_HOLD_MS,
   CoachLine,
   DayCheckIn,
   RestMessage,
@@ -130,8 +132,10 @@ import { colors } from '@/theme'
 /** El anillo dorado del arte del emblema, como fracción del lado del lienzo. */
 const RING_CY = 0.505
 const RING_R = 0.405
-/** Primera medición del emblema; luego se re-mide hasta que quede quieto. */
-const CELEBRATE_SETTLE_MS = 200
+/** Primera medición del emblema; luego se re-mide hasta que quede quieto.
+ *  Espera a que el chip elegido se sostenga y el check-in se recoja: medir
+ *  antes leía el emblema quieto pero todavía abajo (corona ~40 pt baja). */
+const CELEBRATE_SETTLE_MS = CHIP_HOLD_MS + CHECKIN_LAYOUT_MS + 60
 
 function playCommitHaptic(kind: 'trained' | 'backfill' | 'rested') {
   if (kind === 'rested') {
