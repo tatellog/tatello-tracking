@@ -63,6 +63,9 @@ import {
  * teléfono no heredan la conexión de la otra. */
 const connectedKey = (userId: string) => `stelar.wearables.apple_health.connected:${userId}`
 const lastSyncKey = (userId: string) => `stelar.wearables.apple_health.last_sync:${userId}`
+/** El último sello de sync que ESTA sesión ya reflejó en el cache (por usuaria).
+ *  Si el guardado es otro, lo escribió la tarea de fondo: hay que refrescar. */
+const seenSyncStamp = new Map<string, string>()
 /* Último día con sueño del reloj (para re-consultar seguido en la mañana). */
 const lastSleepDayKey = (userId: string) => `stelar.wearables.apple_health.sleep_day:${userId}`
 /* Background delivery ya configurado en este teléfono (se configura una vez;
@@ -245,7 +248,14 @@ export function useAppleHealthConnection(): {
         await AsyncStorage.setItem(lastSyncKey(userId), now).catch(() => {})
         setLastSyncAt(now)
         track('wearable_sync', { source: HEALTH_SOURCE, initial: true, ...counts })
-        if (counts.workouts + counts.sleepDays + counts.waterDays + counts.weightDays > 0) {
+        if (
+          counts.workouts +
+            counts.sleepDays +
+            counts.waterDays +
+            counts.weightDays +
+            counts.stepDays >
+          0
+        ) {
           void qc.invalidateQueries({ queryKey: queryKeys.orbit.all })
         }
         if (counts.weightDays > 0) {
@@ -380,7 +390,18 @@ async function runAppleHealthSync(
         today: todayInTimezone(tz),
         lastSleepDay: sleepDay,
       })
-      if (last && Date.now() - new Date(last).getTime() < interval) return false
+      if (last && Date.now() - new Date(last).getTime() < interval) {
+        // Throttled, pero la tarea de fondo de Android (sin QueryClient) pudo
+        // escribir datos desde lo último que vio esta sesión: refresca lo que
+        // los lee para que Descubre no se quede con lo de antes del sync.
+        if (seenSyncStamp.get(userId) !== last) {
+          seenSyncStamp.set(userId, last)
+          void qc.invalidateQueries({ queryKey: queryKeys.orbit.all })
+          void qc.invalidateQueries({ queryKey: queryKeys.wearables.all })
+          void qc.invalidateQueries({ queryKey: queryKeys.progress.all })
+        }
+        return false
+      }
     }
 
     const counts = await syncAppleHealth(SYNC_WINDOW_DAYS, {
@@ -399,12 +420,18 @@ async function runAppleHealthSync(
     // una notificación; con la app abierta celebra Hoy directo, sin avisar.
     // Todo entreno visto queda anotado para no avisarlo dos veces.
     await announceArrivedWorkouts(userId, todayWorkouts, AppState.currentState !== 'active')
-    await AsyncStorage.setItem(lastSyncKey(userId), new Date().toISOString()).catch(() => {})
+    const stamp = new Date().toISOString()
+    await AsyncStorage.setItem(lastSyncKey(userId), stamp).catch(() => {})
+    seenSyncStamp.set(userId, stamp)
     if (lastSleepDay) {
       await AsyncStorage.setItem(lastSleepDayKey(userId), lastSleepDay).catch(() => {})
     }
     track('wearable_sync', { source: HEALTH_SOURCE, initial: false, forced: force, ...tracked })
-    if (counts.workouts + counts.sleepDays + counts.waterDays + counts.weightDays > 0) {
+    // Pasos también: `daily_signals.steps` alimenta Descubre (sorpresa de pasos).
+    if (
+      counts.workouts + counts.sleepDays + counts.waterDays + counts.weightDays + counts.stepDays >
+      0
+    ) {
       void qc.invalidateQueries({ queryKey: queryKeys.orbit.all })
     }
     if (

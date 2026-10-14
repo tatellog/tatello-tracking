@@ -58,9 +58,10 @@ export function useUpsertMacroTargets() {
   return useMutation({
     mutationFn: (input: MacroTargetsInput) => upsertMacroTargets(input),
     onSuccess: () => {
-      // Only the brief cache needs invalidation now — targets live
-      // inside the brief payload.
+      // Los targets viven en el payload del brief; el reporte persistido de
+      // Descubre (compute-findings) los lee del lado del servidor.
       qc.invalidateQueries({ queryKey: queryKeys.brief.all })
+      qc.invalidateQueries({ queryKey: queryKeys.orbit.all })
     },
   })
 }

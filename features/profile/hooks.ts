@@ -120,6 +120,7 @@ export function useInsertInitialWeight() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.brief.all })
       qc.invalidateQueries({ queryKey: queryKeys.progress.all })
+      qc.invalidateQueries({ queryKey: queryKeys.orbit.all })
     },
   })
 }

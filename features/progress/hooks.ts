@@ -362,6 +362,8 @@ export function useAddMeasurement() {
     onSettled: () => {
       qc.invalidateQueries({ queryKey: queryKeys.progress.all })
       qc.invalidateQueries({ queryKey: queryKeys.brief.all })
+      // El peso entra a `daily_signals.weight_kg`: Descubre lo lee.
+      qc.invalidateQueries({ queryKey: queryKeys.orbit.all })
     },
   })
 }
