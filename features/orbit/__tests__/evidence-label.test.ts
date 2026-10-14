@@ -306,3 +306,45 @@ describe('patternSourceLine (ST-006 · fuente: ambos registros)', () => {
     expect(patternSourceLine('training-protein', signals)).toBe('Con tus registros')
   })
 })
+
+describe('"Lo que no sabías" · fuente y días del detalle (ST-006)', () => {
+  it('pasos y hora de dormir solo existen con reloj: nombra ambos siempre', () => {
+    expect(patternSourceLine('steps-deficit', [])).toBe('Con tus registros y tu smartwatch')
+    expect(patternSourceLine('late-bedtime', [])).toBe('Con tus registros y tu smartwatch')
+  })
+
+  it('noche corta: ambos solo si alguna noche vino del reloj', () => {
+    const manual = month(4, () => ({ sleep_minutes: 300, sleep_source: 'manual' }))
+    expect(patternSourceLine('short-night', manual)).toBe('Con tus registros')
+    const watch = month(4, (i) => ({
+      sleep_minutes: 300,
+      sleep_source: i === 0 ? 'wearable' : 'manual',
+    }))
+    expect(patternSourceLine('short-night', watch)).toBe('Con tus registros y tu smartwatch')
+  })
+
+  it('el día que se rompe y el rescate son de comida: tus registros', () => {
+    const watch = month(4, () => ({ sleep_minutes: 300, sleep_source: 'wearable' }))
+    expect(patternSourceLine('weekday-break', watch)).toBe('Con tus registros')
+    expect(patternSourceLine('rescue', watch)).toBe('Con tus registros')
+  })
+
+  it('cada sorpresa nombra qué son sus días', () => {
+    const signals = month(14, (i) => ({
+      meal_count: 3,
+      sleep_minutes: i % 2 === 0 ? 300 : 450,
+      calories: i % 2 === 0 ? 2100 : 1500,
+    }))
+    const s = shortNightEffect(signals)!
+    expect(s.daysLabel).toBe('Tras dormir menos de 6 h')
+    expect(s.days).toHaveLength(7)
+    const r = rescueAfterOver(
+      month(20, (i) => ({
+        meal_count: 2,
+        calories: i % 4 === 0 ? 2400 : i % 4 === 1 ? 1500 : 900,
+      })),
+      { calorieTarget: TARGET },
+    )!
+    expect(r.daysLabel).toBe('El día después')
+  })
+})

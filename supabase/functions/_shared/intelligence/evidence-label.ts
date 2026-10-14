@@ -120,7 +120,13 @@ const SOURCE_DIM: Record<string, 'sleep' | 'workout'> = {
   'movement-deficit': 'workout',
   'workout-type-deficit': 'workout',
   'consistent-training': 'workout',
+  // "Lo que no sabías" (surprise.ts)
+  'short-night': 'sleep',
+  'protein-training': 'workout',
 }
+/* Hallazgos que solo existen con el reloj (pasos, hora de dormirse): la
+ * comida sigue siendo tuya, así que la fuente siempre nombra ambos. */
+const WATCH_ONLY = new Set(['steps-deficit', 'late-bedtime'])
 
 /**
  * La fuente del hallazgo (ST-006, decisión de la dueña 13 oct 2026: nombrar
@@ -130,8 +136,9 @@ const SOURCE_DIM: Record<string, 'sleep' | 'workout'> = {
  */
 export function patternSourceLine(patternId: string, signals: readonly DailySignals[]): string {
   const dim = SOURCE_DIM[patternId]
-  const fromWatch =
-    dim === 'sleep'
+  const fromWatch = WATCH_ONLY.has(patternId)
+    ? true
+    : dim === 'sleep'
       ? signals.some((s) => s.sleep_minutes != null && s.sleep_source === 'wearable')
       : dim === 'workout'
         ? signals.some((s) => s.trained === true && s.workout_source === 'wearable')

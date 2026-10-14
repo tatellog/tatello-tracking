@@ -108,6 +108,7 @@ export function lateBedtimeEffect(
       { label: late_label, value: `${ld} de ${late.length}` },
     ],
     days: late.map((n) => n.day).sort(),
+    daysLabel: late_label,
     effect: Math.min(1, diff / 0.5),
     minSide: Math.min(late.length, early.length),
     expected: false,

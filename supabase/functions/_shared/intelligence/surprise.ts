@@ -40,6 +40,9 @@ export type Surprise = {
   rows: SurpriseRow[]
   /** Días de la evidencia (el lado "fuerte"). */
   days: string[]
+  /** Qué son esos días, para el detalle ("Tras dormir menos de 6 h"). No
+   *  siempre es la fila fuerte (hora de dormir: los días son las noches tarde). */
+  daysLabel: string
   /** 0..1, ya normalizado por detector. */
   effect: number
   /** Muestra del lado más chico de la comparación. */
@@ -133,6 +136,7 @@ export function shortNightEffect(signals: readonly DailySignals[]): Surprise | n
       { label: 'Tras dormir 7 h o más', value: `${fmt(b)} kcal` },
     ],
     days: short.map((s) => s.day!),
+    daysLabel: 'Tras dormir menos de 6 h',
     effect: clamp01(diff / 400),
     minSide: Math.min(short.length, good.length),
     expected: false,
@@ -171,6 +175,7 @@ export function proteinTrainingGap(signals: readonly DailySignals[]): Surprise |
       { label: 'Días sin entreno', value: `${fmt(b)} g` },
     ],
     days: train.map((s) => s.day!),
+    daysLabel: 'Días con entreno',
     effect: clamp01(Math.abs(diff) / 40),
     minSide: Math.min(train.length, rest.length),
     // Comer más proteína cuando entrena es lo esperado; comer menos, no.
@@ -214,6 +219,7 @@ export function stepsDeficit(
       { label: 'Menos pasos', value: `${ld} de ${low.length}` },
     ],
     days: high.map((s) => s.day!),
+    daysLabel: `${steps} pasos o más`,
     effect: clamp01(diff / 0.5),
     minSide: Math.min(high.length, low.length),
     expected: true, // moverse ↔ déficit: ya lo intuye
@@ -271,6 +277,7 @@ export function weekdayBreak(
       { label: 'El resto de la semana', value: `${rd} de ${rest.length}` },
     ],
     days: days.filter((s) => weekdayMon(s.day!) === worst!.wd).map((s) => s.day!),
+    daysLabel: `${WEEKDAYS_PLURAL[worst.wd]!.charAt(0).toUpperCase()}${WEEKDAYS_PLURAL[worst.wd]!.slice(1)}`,
     effect: clamp01(diff / 0.5),
     minSide: Math.min(worst.n, rest.length),
     expected: weekend, // "el finde se me complica" ya lo sabe
@@ -316,6 +323,7 @@ export function rescueAfterOver(
       { label: 'Tus días en general', value: `${base} de ${days.length}` },
     ],
     days: after.map((s) => s.day!),
+    daysLabel: 'El día después',
     effect: clamp01(diff / 0.5),
     minSide: Math.min(after.length, days.length),
     expected: false,

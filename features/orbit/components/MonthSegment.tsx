@@ -635,6 +635,8 @@ export function MonthSegment({
   }, [signals, today, calorieTarget, proteinTarget, waterGoalGlasses])
 
   const [evidence, setEvidence] = useState<EvidenceItem | null>(null)
+  // El detalle de "Lo que no sabías" (ST-006): su propio modal, con filas.
+  const [surpriseOpen, setSurpriseOpen] = useState(false)
   // Abrir una evidencia cuenta como visto para el push N9: ese hallazgo no se
   // avisa en 14 días (no se manda lo que ya leíste).
   const qc = useQueryClient()
@@ -910,6 +912,7 @@ export function MonthSegment({
                       { kind: 'pattern', sample: surprise.sample },
                       maturity.stage,
                     )}
+                    onOpen={() => setSurpriseOpen(true)}
                   />
                 ) : null}
                 {surprise && combo ? (
@@ -1121,6 +1124,16 @@ export function MonthSegment({
       ) : null}
 
       <EvidenceModal pattern={evidence} onClose={() => setEvidence(null)} />
+      {surprise ? (
+        <SurpriseDetailModal
+          visible={surpriseOpen}
+          surprise={surprise}
+          label={monthPatternLabel({ kind: 'pattern', sample: surprise.sample }, maturity.stage)}
+          source={patternSourceLine(surprise.id, patternSignals)}
+          unknowns={evidenceUnknowns({ kind: 'pattern', sample: surprise.sample }, maturity.stage)}
+          onClose={() => setSurpriseOpen(false)}
+        />
+      ) : null}
       <NotifyOfferSheet
         visible={notifyOffer.visible && reveal == null}
         trigger="pattern"
@@ -1644,34 +1657,112 @@ function comboSentence(combo: WinningComboData): string {
  * ranker de sorpresa: lo que ella NO sabía, no lo que más se repite. La frase
  * es el hallazgo; debajo, la comparación que lo prueba (dos filas, la fuerte
  * primero). Sin ✦: el motor lo encontró, no hay chat detrás (regla IA visible). */
-function SurpriseHero({ surprise, label }: { surprise: Surprise; label: EvidenceLabel }) {
+function SurpriseHero({
+  surprise,
+  label,
+  onOpen,
+}: {
+  surprise: Surprise
+  label: EvidenceLabel
+  onOpen: () => void
+}) {
   const sampleLine = patternSampleLine(surprise.sample)
   return (
     <Animated.View entering={FadeIn.duration(420)} style={styles.surprise}>
-      <Text
-        style={styles.surpriseKicker}
-      >{`Lo que no sabías · ${EVIDENCE_LABEL_TEXT[label]}`}</Text>
-      {/* Procedencia a la vista: lo que sale del smartwatch lo dice ANTES de
-          la frase, para que nunca parezca que Stelar lo adivinó. */}
-      {surprise.fromWatch ? (
-        <View style={styles.surpriseSource}>
-          <WatchMark past inline={false} />
-          <Text style={styles.surpriseSourceText}>Con datos de tu smartwatch</Text>
-        </View>
-      ) : null}
-      <Text style={styles.surpriseHeadline}>{surprise.headline}</Text>
-      <View style={styles.surpriseRows}>
-        {surprise.rows.map((r) => (
-          <View key={r.label} style={styles.surpriseRow}>
-            <Text style={[styles.surpriseLabel, r.strong && styles.surpriseStrong]}>{r.label}</Text>
-            <Text style={[styles.surpriseValue, r.strong && styles.surpriseValueStrong]}>
-              {r.value}
-            </Text>
+      <Pressable
+        onPress={onOpen}
+        accessibilityRole="button"
+        accessibilityLabel={`Lo que no sabías. ${EVIDENCE_LABEL_TEXT[label]}. ${surprise.headline} ${sampleLine ?? ''}. Ver el detalle.`}
+      >
+        <Text
+          style={styles.surpriseKicker}
+        >{`Lo que no sabías · ${EVIDENCE_LABEL_TEXT[label]}`}</Text>
+        {/* Procedencia a la vista: lo que sale del smartwatch lo dice ANTES de
+            la frase, para que nunca parezca que Stelar lo adivinó. */}
+        {surprise.fromWatch ? (
+          <View style={styles.surpriseSource}>
+            <WatchMark past inline={false} />
+            <Text style={styles.surpriseSourceText}>Con datos de tu smartwatch</Text>
           </View>
-        ))}
-      </View>
-      {sampleLine ? <Text style={styles.findingSample}>{sampleLine}</Text> : null}
+        ) : null}
+        <Text style={styles.surpriseHeadline}>{surprise.headline}</Text>
+        <SurpriseRows rows={surprise.rows} />
+        {sampleLine ? <Text style={styles.findingSample}>{sampleLine}</Text> : null}
+        <View style={styles.findingCta}>
+          <Text style={styles.findingCtaText}>Ver el detalle</Text>
+          <Text style={styles.findingCtaArrow}>→</Text>
+        </View>
+      </Pressable>
     </Animated.View>
+  )
+}
+
+/** La comparación que prueba un hallazgo: dos filas, la fuerte primero. */
+function SurpriseRows({ rows }: { rows: Surprise['rows'] }) {
+  return (
+    <View style={styles.surpriseRows}>
+      {rows.map((r) => (
+        <View key={r.label} style={styles.surpriseRow}>
+          <Text style={[styles.surpriseLabel, r.strong && styles.surpriseStrong]}>{r.label}</Text>
+          <Text style={[styles.surpriseValue, r.strong && styles.surpriseValueStrong]}>
+            {r.value}
+          </Text>
+        </View>
+      ))}
+    </View>
+  )
+}
+
+/* El detalle de "Lo que no sabías" (ST-006 · D-03): qué tipo de hallazgo es,
+ * la comparación, cuántos días, de dónde salen, cuáles fueron y lo que todavía
+ * no sabemos. Mismo vocabulario que el modal de patrones; sin ✦ (motor). */
+function SurpriseDetailModal({
+  visible,
+  surprise,
+  label,
+  source,
+  unknowns,
+  onClose,
+}: {
+  visible: boolean
+  surprise: Surprise
+  label: EvidenceLabel
+  source: string
+  unknowns: string[]
+  onClose: () => void
+}) {
+  const sampleLine = patternSampleLine(surprise.sample)
+  return (
+    <StelarModal visible={visible} onClose={onClose}>
+      <View style={styles.evStack}>
+        <Text style={styles.evLabel}>{EVIDENCE_LABEL_TEXT[label]}</Text>
+        <Text style={styles.evTitle}>{surprise.headline}</Text>
+        <SurpriseRows rows={surprise.rows} />
+        {sampleLine ? <Text style={styles.evMeta}>{sampleLine}</Text> : null}
+        <Text style={styles.evMeta}>{source}</Text>
+        {surprise.days.length > 0 ? (
+          <Text style={styles.modalDates}>
+            {`${surprise.daysLabel}: ${formatDates(surprise.days).replace(/^Fueron/, 'fueron')}`}
+          </Text>
+        ) : null}
+        <EvidenceUnknowns lines={unknowns} />
+      </View>
+    </StelarModal>
+  )
+}
+
+/** "Lo que todavía no sabemos": los límites del hallazgo, al pie del detalle. */
+function EvidenceUnknowns({ lines }: { lines: readonly string[] | undefined }) {
+  if (!lines || lines.length === 0) return null
+  return (
+    <View style={styles.evUnknowns}>
+      <Text style={styles.evUnknownsTitle}>Lo que todavía no sabemos</Text>
+      {lines.map((u) => (
+        <Text key={u} style={styles.evUnknown}>
+          {u}
+        </Text>
+      ))}
+    </View>
   )
 }
 
@@ -2250,16 +2341,7 @@ function EvidenceModal({
               ) : null}
             </>
           )}
-          {pattern.unknowns && pattern.unknowns.length > 0 ? (
-            <View style={styles.evUnknowns}>
-              <Text style={styles.evUnknownsTitle}>Lo que todavía no sabemos</Text>
-              {pattern.unknowns.map((u) => (
-                <Text key={u} style={styles.evUnknown}>
-                  {u}
-                </Text>
-              ))}
-            </View>
-          ) : null}
+          <EvidenceUnknowns lines={pattern.unknowns} />
         </View>
       ) : null}
     </StelarModal>
