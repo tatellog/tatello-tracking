@@ -1807,6 +1807,8 @@ function StrongDayCard({
   const evidence =
     EVIDENCE_LABEL_TEXT[monthPatternLabel({ kind: 'pattern', sample }, maturityStage)]
   const sampleLine = patternSampleLine(sample)
+  // ST-006: los límites del combo con la MISMA muestra que enseña la tarjeta.
+  const unknowns = evidenceUnknowns({ kind: 'pattern', sample }, maturityStage)
   const kicker = done ? '★ Día fuerte armado' : `Tu día fuerte · ${evidence}`
   const headline = done
     ? 'Hoy lo juntaste.'
@@ -2043,6 +2045,8 @@ function StrongDayCard({
           ) : null}
         </>
       ) : null}
+
+      <EvidenceUnknowns lines={unknowns} footnote />
 
       {/* La IA: la píldora con borde aurora (el degradado del chat), sin
           relleno magenta. La dueña la prefirió sobre la fila discreta. */}
