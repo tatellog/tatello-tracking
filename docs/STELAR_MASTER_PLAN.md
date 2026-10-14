@@ -599,6 +599,13 @@ Copy/paste the following into a Claude coding session:
   - `features/orbit/surprise-seen.ts` (nuevo): qué revelaciones ya viste, solo en el teléfono (AsyncStorage); no toca `seen_combos`.
 - **Tests:** jest 108 / 1345 ✓, tsc ✓, eslint ✓. **Visual:** simulador iOS, cuenta dev (con preview temporal revertido): conteo a mitad ✓, final con chispas ✓. El bloque Hoy no se vio (sin pasos hoy en dev).
 
+### 2026-10-13 — ST-006 corte 4 (corte de pasos exacto) — rama `master-plan-integrity`
+
+- **As-is:** `stepsDeficit` nombraba el corte redondeado hacia abajo a 500 (3,490 → "3,000 pasos o más"). Días de 3,030 y 3,247 quedaban en "menos pasos" aunque la frase dijera 3,000, y "te faltan N para los 3,000" prometía de más.
+- **Decisión de la dueña:** "que sea exacto".
+- **Cambio:** `stepsLabelCut(cut, maxLow)` en `surprise.ts`: redondea a 100 hacia abajo solo si sigue por encima del día con más pasos del grupo bajo; si no, el corte tal cual. Frase, filas, anillo y Hoy usan ese mismo número. Cuenta dev: "3,400 pasos o más", 9 de 11 contra 1 de 11.
+- **Tests:** jest 108 / 1348 ✓ (3 nuevos: redondeo, fallback al corte y propiedad "separa exacto"), tsc ✓, eslint ✓.
+
 ---
 
 ## 11. DECISION LOG — DO NOT SILENTLY REVERSE
@@ -619,6 +626,7 @@ Copy/paste the following into a Claude coding session:
 | 2026-10-13 | El promedio de kcal del motor (`avgCalories`, hecho `avg_calories`, contexto de la IA) usa SOLO días completos y declara la base (`completeDays`)                          | Decisión de la dueña (§12 P12-a): un parcial no baja el promedio ni infla el déficit. La Lectura Semanal mantiene su excepción (parciales incluidos, copy declarado)   | —                                                         |
 | 2026-10-13 | "Patrón detectado" exige madurez general Y ≥5 días por grupo comparado; si no, "Observación inicial"                                                                       | Decisión de la dueña (§12 P13): la etiqueta no debe sobreafirmar un lado con 3 días                                                                                    | —                                                         |
 | 2026-10-13 | El detalle de un patrón nombra su fuente; si mezcla registros tuyos y del reloj, nombra ambos ("Con tus registros y tu smartwatch")                                        | Decisión de la dueña: no ocultar que parte de la evidencia viene del reloj, ni que la comida es tuya                                                                   | —                                                         |
+| 2026-10-13 | El número de pasos que nombra un hallazgo separa EXACTO los dos grupos (redondeo a 100 solo si no mete días del otro grupo)                                                | Decisión de la dueña: "que sea exacto"; el "te faltan N" no puede prometer de más                                                                                      | —                                                         |
 | 2026-10-13 | Plan maestro vive en `docs/STELAR_MASTER_PLAN.md` (copia del original en Downloads)                                                                                        | Persistir el ledger con el repo                                                                                                                                        | —                                                         |
 
 ---

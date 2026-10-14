@@ -14,6 +14,7 @@ import {
   rescueAfterOver,
   shortNightEffect,
   stepsDeficit,
+  stepsLabelCut,
   surpriseToday,
 } from '../surprise'
 import { addDays, mkSig, monIdxUTC } from './signals.fixture'
@@ -404,5 +405,33 @@ describe('detalle estilo Fitness: comparación en números y "hoy" (ST-006)', ()
     const s = shortNightEffect(signals)!
     expect(s.compare).toBeUndefined()
     expect(s.otherDays).toHaveLength(7)
+  })
+})
+
+describe('pasos: el número que se nombra separa exacto los dos grupos', () => {
+  it('redondea a 100 si ningún día con menos pasos lo alcanza (caso cuenta dev)', () => {
+    expect(stepsLabelCut(3490, 3247)).toBe(3400)
+  })
+
+  it('si el redondeo metería un día del otro grupo, usa el corte tal cual', () => {
+    expect(stepsLabelCut(3490, 3450)).toBe(3490)
+    expect(stepsLabelCut(3400, 3399)).toBe(3400)
+  })
+
+  it('la frase, las filas y "hoy" usan el mismo número, y es exacto', () => {
+    const signals = month(12, (i) => ({
+      meal_count: 2,
+      steps: [3030, 3247, 2000, 1500, 900, 2800, 3490, 5914, 6329, 7412, 6602, 4100][i],
+      calories: i >= 6 ? 1400 : 2400,
+    }))
+    const s = stepsDeficit(signals, { calorieTarget: TARGET })!
+    const x = s.threshold!.value
+    const strongDays = new Set(s.compare!.strong.days)
+    for (const sig of signals) {
+      if (strongDays.has(sig.day!)) expect(sig.steps!).toBeGreaterThanOrEqual(x)
+      else expect(sig.steps!).toBeLessThan(x)
+    }
+    expect(s.headline).toContain(`${x.toLocaleString('es-MX')} pasos o más`)
+    expect(s.rows[0]!.label).toBe(`${x.toLocaleString('es-MX')} pasos o más`)
   })
 })

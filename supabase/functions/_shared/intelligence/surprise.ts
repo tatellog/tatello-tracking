@@ -200,6 +200,13 @@ export function proteinTrainingGap(signals: readonly DailySignals[]): Surprise |
   }
 }
 
+/** El número de pasos que se nombra: `cut` redondeado a 100 hacia abajo si
+ *  sigue por ENCIMA del día con más pasos del grupo bajo; si no, `cut`. */
+export function stepsLabelCut(cut: number, maxLow: number): number {
+  const rounded = Math.floor(cut / 100) * 100
+  return rounded > maxLow ? rounded : cut
+}
+
 /** Pasos contra déficit: la mitad de días con más pasos contra la otra mitad. */
 export function stepsDeficit(
   signals: readonly DailySignals[],
@@ -218,8 +225,12 @@ export function stepsDeficit(
   const ld = low.filter((s) => isDeficitDay(s.calories, target)).length
   const diff = hd / high.length - ld / low.length
   if (diff < 0.2) return null
-  // Hacia abajo: "X pasos o más" siempre es verdad para esos días.
-  const steps = (Math.floor(cut / 500) * 500).toLocaleString('es-MX')
+  // El número que se nombra separa EXACTO los dos grupos (dueña 13 oct 2026:
+  // "que sea exacto"): todo día con más pasos lo alcanza y ningún día con menos
+  // pasos llega. Redondeado a 100 cuando el redondeo no mete días del otro
+  // grupo; si los mete, el corte tal cual. Así "te faltan N para los X" es cierto.
+  const stepCut = stepsLabelCut(cut, Math.max(...low.map((s) => s.steps!)))
+  const steps = stepCut.toLocaleString('es-MX')
   return {
     id: 'steps-deficit',
     sample: {
@@ -245,7 +256,7 @@ export function stepsDeficit(
       },
       other: { label: 'Menos pasos', hits: ld, total: low.length, days: low.map((s) => s.day!) },
     },
-    threshold: { kind: 'steps', value: Math.floor(cut / 500) * 500 },
+    threshold: { kind: 'steps', value: stepCut },
     effect: clamp01(diff / 0.5),
     minSide: Math.min(high.length, low.length),
     expected: true, // moverse ↔ déficit: ya lo intuye
