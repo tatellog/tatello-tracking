@@ -36,6 +36,9 @@ export type Surprise = {
   id: SurpriseId
   /** La frase del hallazgo, dicha (nunca el número pelón). */
   headline: string
+  /** El mismo hallazgo en 4-6 palabras, para Hoy (que solo avisa; el detalle
+   *  y sus números viven en Descubre). Sin causa: dos cosas que coinciden. */
+  short: string
   /** La comparación que lo prueba: dos filas, la fuerte primero. */
   rows: SurpriseRow[]
   /** Días de la evidencia (el lado "fuerte"). */
@@ -143,6 +146,7 @@ export function shortNightEffect(signals: readonly DailySignals[]): Surprise | n
         { label: 'Noches de 7 h o más', days: good.length },
       ],
     },
+    short: 'Noches cortas, días con más calorías',
     headline: `Después de dormir menos de 6 horas, tu cuerpo pide unas ${fmt(diff)} kcal más ese día.`,
     rows: [
       { label: 'Tras dormir menos de 6 h', value: `${fmt(a)} kcal`, strong: true },
@@ -181,6 +185,7 @@ export function proteinTrainingGap(signals: readonly DailySignals[]): Surprise |
         { label: 'Sin entreno', days: rest.length },
       ],
     },
+    short: less ? 'Días de entreno, menos proteína' : 'Días de entreno, más proteína',
     headline: less
       ? `Los días que entrenas comes unos ${fmt(-diff)} g menos de proteína que cuando descansas.`
       : `Los días que entrenas comes unos ${fmt(diff)} g más de proteína que cuando descansas.`,
@@ -239,6 +244,7 @@ export function stepsDeficit(
         { label: 'Menos pasos', days: low.length },
       ],
     },
+    short: 'Más pasos, más días en déficit',
     headline: `Tus días de ${steps} pasos o más cierran en déficit más seguido.`,
     rows: [
       { label: `${steps} pasos o más`, value: `${hd} de ${high.length}`, strong: true },
@@ -302,6 +308,7 @@ export function weekdayBreak(
         { label: 'Resto de la semana', days: rest.length },
       ],
     },
+    short: `Tu día más complicado: el ${name}`,
     headline: weekend
       ? `El día que más se te complica es el ${name}.`
       : `No es el fin de semana: el día que más se te complica es el ${name}.`,
@@ -369,6 +376,7 @@ export function rescueAfterOver(
       ],
       total: days.length,
     },
+    short: 'Tras un día alto, vuelves al déficit',
     headline: 'Después de un día sobre tu meta, al día siguiente vuelves más seguido al déficit.',
     rows: [
       { label: 'El día después', value: `${ad} de ${after.length}`, strong: true },

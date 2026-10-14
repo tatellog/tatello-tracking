@@ -95,6 +95,7 @@ export function lateBedtimeEffect(
         { label: 'Te dormiste más tarde', days: late.length },
       ],
     },
+    short: 'Dormirte tarde, menos días en déficit',
     headline:
       when === 'después de medianoche'
         ? 'Cuando te duermes después de medianoche, al día siguiente cierras en déficit menos seguido.'

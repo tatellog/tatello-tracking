@@ -47,7 +47,7 @@ describe('hoyDiscoveryVisible', () => {
 })
 
 describe('hoyDiscoveryModel', () => {
-  it('dice lo mismo que Descubre, con los números en texto', () => {
+  it('Hoy solo avisa: etiqueta + título corto, sin números', () => {
     const signals = Array.from({ length: 12 }, (_, i) =>
       mkSig(addDays('2026-06-01', i), {
         meal_count: 2,
@@ -57,10 +57,24 @@ describe('hoyDiscoveryModel', () => {
     )
     const s = stepsDeficit(signals, { calorieTarget: 1800 })!
     const m = hoyDiscoveryModel(featuredOf(s, null, [])!, 3, signals, { calorieTarget: 1800 })
-    expect(m.title).toBe(s.headline)
-    expect(m.label).toBe('patron')
-    expect(m.eyebrow).toBe('Nuevo patrón encontrado')
-    expect(m.numbers).toBe('9,000 pasos o más: 6 de 6 · Menos pasos: 0 de 6')
-    expect(m.evidence).toBe('12 días comparados · con tus registros y tu smartwatch')
+    expect(m).toEqual({
+      label: 'patron',
+      eyebrow: 'Nuevo patrón',
+      title: 'Más pasos, más días en déficit',
+      lookId: 'steps-deficit',
+    })
+  })
+
+  it('con poca muestra la etiqueta baja a observación', () => {
+    const signals = Array.from({ length: 12 }, (_, i) =>
+      mkSig(addDays('2026-06-01', i), {
+        meal_count: 2,
+        steps: i % 2 === 0 ? 9000 : 2000,
+        calories: i % 2 === 0 ? 1400 : 2400,
+      }),
+    )
+    const s = stepsDeficit(signals, { calorieTarget: 1800 })!
+    const m = hoyDiscoveryModel(featuredOf(s, null, [])!, 2, signals, { calorieTarget: 1800 })
+    expect(m.eyebrow).toBe('Nueva observación')
   })
 })

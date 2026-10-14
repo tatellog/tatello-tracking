@@ -5,18 +5,12 @@
  * fondo. Se va al abrirlo (en Hoy o en Descubre) o tras mostrarse en 3 días
  * distintos; después vive en Descubre, que ya lo pone primero.
  *
- * Forma (revisión UX): una franja, no una tarjeta ("Tu día" sigue siendo la
- * única tarjeta de lectura), en la paleta de Hoy, con los números en texto.
+ * Forma (dueña 14 oct 2026): UNA fila tocable con ícono y título corto. Hoy
+ * solo avisa que hay algo nuevo; la explicación vive en Descubre.
  */
-import { comboKcalGap, fmtKcalDelta, type ComboOpts } from './combo-facts'
-import {
-  comboEvidenceSample,
-  monthPatternLabel,
-  patternSourceLine,
-  type EvidenceLabel,
-  type PatternSample,
-} from './evidence-label'
-import { comboPhrase } from './month-built'
+import { comboKcalGap, type ComboOpts } from './combo-facts'
+import { comboEvidenceSample, monthPatternLabel, type EvidenceLabel } from './evidence-label'
+import { comboPhrase, type WinningCombo } from './month-built'
 import type { DailySignals } from './api'
 import type { FeaturedDiscovery } from './featured-discovery'
 
@@ -56,24 +50,31 @@ export function markHoyDiscoveryOpened(state: HoyDiscoveryState, id: string): Ho
 export type HoyDiscoveryModel = {
   label: EvidenceLabel
   eyebrow: string
+  /** El hallazgo en 4-6 palabras. Hoy solo avisa: los números, la muestra y
+   *  la fuente viven en el detalle de Descubre (dueña 14 oct 2026: la gente
+   *  casi no lee, Hoy no carga texto). */
   title: string
-  numbers: string | null
-  evidence: string
+  /** Para el ícono (el mismo del detalle); null en el combo. */
+  lookId: string | null
 }
 
-function evidenceLine(sample: PatternSample | undefined, source: string): string {
-  const total = sample ? (sample.total ?? sample.groups.reduce((a, g) => a + g.days, 0)) : null
-  return [total ? `${total} días comparados` : null, source.toLowerCase()]
-    .filter(Boolean)
-    .join(' · ')
+/** Títulos cortos de los patrones de apoyo. Los que faltan ya son cortos y
+ *  usan su primera oración. */
+const PATTERN_SHORT: Record<string, string> = {
+  'sleep-deficit': 'Dormir 7 h o más, más días en déficit',
+  'training-protein': 'Días de entreno, más proteína',
+  'movement-deficit': 'Días de entreno, más días en déficit',
 }
 
-const pair = (label: string, hits: number, total: number) => `${label}: ${hits} de ${total}`
+const firstSentence = (t: string) => t.split('. ')[0]!.replace(/\.$/, '')
 
-/**
- * Lo que dice la franja, con la MISMA etiqueta y muestra que Descubre. Los
- * números van en texto (en Hoy el único anillo es el del emblema).
- */
+/** "Tu día fuerte: dormir bien y entrenar" (el combo sin su remate). */
+function comboShort(combo: WinningCombo): string {
+  const list = comboPhrase(combo).replace(/ coincidieron con tu déficit\.$/, '')
+  return `Tu día fuerte: ${list.charAt(0).toLowerCase()}${list.slice(1)}`
+}
+
+/** Lo que dice la fila, con la MISMA etiqueta que Descubre. */
 export function hoyDiscoveryModel(
   featured: FeaturedDiscovery,
   maturityStage: number,
@@ -81,61 +82,27 @@ export function hoyDiscoveryModel(
   opts: ComboOpts,
 ): HoyDiscoveryModel {
   const eyebrowOf = (label: EvidenceLabel) =>
-    label === 'patron' ? 'Nuevo patrón encontrado' : 'Nueva observación'
+    label === 'patron' ? 'Nuevo patrón' : 'Nueva observación'
 
   if (featured.kind === 'surprise') {
     const s = featured.surprise
     const label = monthPatternLabel({ kind: 'pattern', sample: s.sample }, maturityStage)
-    const c = s.compare
-    const strong = s.rows.find((r) => r.strong) ?? s.rows[0]
-    const other = s.rows.find((r) => r !== strong)
-    return {
-      label,
-      eyebrow: eyebrowOf(label),
-      title: s.headline,
-      numbers: c
-        ? `${pair(c.strong.label, c.strong.hits, c.strong.total)} · ${pair(c.other.label, c.other.hits, c.other.total)}`
-        : strong && other
-          ? `${strong.label}: ${strong.value} · ${other.label}: ${other.value}`
-          : null,
-      evidence: evidenceLine(s.sample, patternSourceLine(s.id, signals)),
-    }
+    return { label, eyebrow: eyebrowOf(label), title: s.short, lookId: s.id }
   }
 
   if (featured.kind === 'combo') {
     const combo = featured.combo
-    const gap = comboKcalGap(signals, combo, opts)
-    const sample = comboEvidenceSample(combo, gap)
+    const sample = comboEvidenceSample(combo, comboKcalGap(signals, combo, opts))
     const label = monthPatternLabel({ kind: 'pattern', sample }, maturityStage)
-    const keys = combo.signals.map((x) => x.key)
-    const source = keys.includes('sueno')
-      ? patternSourceLine('sleep-deficit', signals)
-      : keys.includes('cuerpo')
-        ? patternSourceLine('movement-deficit', signals)
-        : 'Con tus registros'
-    return {
-      label,
-      eyebrow: eyebrowOf(label),
-      title: comboPhrase(combo),
-      numbers: gap
-        ? `${fmtKcalDelta(gap.withAvg - gap.restAvg)} por día, contra tus otros días`
-        : `${pair('Con el patrón', combo.deficits, combo.occurrences)} · ${pair('Otros días', combo.restDeficits, combo.restDays)}`,
-      evidence: evidenceLine(sample, source),
-    }
+    return { label, eyebrow: eyebrowOf(label), title: comboShort(combo), lookId: null }
   }
 
   const p = featured.pattern
   const label = monthPatternLabel(p, maturityStage)
-  const hi = p.evidence.bars.find((b) => b.highlight) ?? p.evidence.bars[0]
-  const other = p.evidence.bars.find((b) => b !== hi)
-  const rated = hi?.total != null && other?.total != null
   return {
     label,
     eyebrow: eyebrowOf(label),
-    title: p.title,
-    numbers: rated
-      ? `${pair(hi!.label, hi!.value, hi!.total!)} · ${pair(other!.label, other!.value, other!.total!)}`
-      : null,
-    evidence: evidenceLine(p.sample, patternSourceLine(p.id, signals)),
+    title: PATTERN_SHORT[p.id] ?? firstSentence(p.title),
+    lookId: p.id,
   }
 }

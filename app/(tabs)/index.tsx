@@ -1124,7 +1124,7 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
             </Animated.View>
 
             {/* El hallazgo NUEVO (ST-007): el mismo que encabeza Descubre, como
-                franja, solo mientras es nuevo. Tocarlo abre ESE hallazgo allá. */}
+                fila corta, solo mientras es nuevo. Tocarlo abre ESE hallazgo allá. */}
             {!viewingPast && showFeatured ? (
               <View style={styles.featuredWrap}>
                 <HoyDiscoveryStrip
