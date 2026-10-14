@@ -16,7 +16,8 @@
  * días en CADA grupo comparado. Cambiar cualquiera de los dos cortes es
  * decisión de producto (plan maestro, regla 10).
  */
-import type { MonthPattern } from './month-built.ts'
+import type { EvidenceBar, MonthPattern } from './month-built.ts'
+import type { DailySignals } from './types.ts'
 
 export type EvidenceLabel = 'dato' | 'observacion' | 'patron' | 'hipotesis' | 'general'
 
@@ -66,4 +67,74 @@ export function patternSampleLine(sample: PatternSample | null | undefined): str
   if (total <= 0) return null
   const parts = sample.groups.map((g) => `${g.label} ${g.days}`)
   return [`${total} ${total === 1 ? 'día comparado' : 'días comparados'}`, ...parts].join(' · ')
+}
+
+/**
+ * "Lo que todavía no sabemos" (ST-006, plan §5 D-03): los límites HONESTOS de
+ * un hallazgo, derivados de su etiqueta y su muestra. Nunca agrega datos: solo
+ * dice qué no prueba. Un dato registrado (constancia) no tiene límites que
+ * declarar: es un conteo.
+ */
+export function evidenceUnknowns(
+  p: Pick<MonthPattern, 'kind' | 'sample'>,
+  maturityStage: number,
+): string[] {
+  if (p.kind === 'discovery') return []
+  const out = [
+    'Por qué pasa. Esto muestra que coincidieron en tus días, no que una cosa cause la otra.',
+  ]
+  const groups = p.sample?.groups ?? []
+  const small = groups.filter((g) => g.days < PATTERN_MIN_DAYS_PER_GROUP)
+  if (small.length > 0) {
+    const list = small.map((g) => `${g.label}: ${g.days}`).join(', ')
+    out.push(
+      `Si se sostiene. Hay pocos días en ${small.length === 1 ? 'un grupo' : 'algunos grupos'} (${list}); con ${PATTERN_MIN_DAYS_PER_GROUP} o más en cada uno sería patrón detectado.`,
+    )
+  } else if (maturityStage <= EARLY_MATURITY_MAX_STAGE) {
+    out.push('Si se sostiene. Llevas pocos días con datos; lo sigo mirando.')
+  }
+  return out
+}
+
+/**
+ * Qué barras del detalle se dibujan y cuáles bajan a "aún sin registro". Una
+ * barra CON denominador y días (total > 0) se dibuja aunque valga 0: "0 de 3
+ * días" es evidencia (el lado que no se dio), no un hueco. Sin días, o sin
+ * denominador y en 0, no hay registro.
+ */
+export function splitEvidenceBars(bars: readonly EvidenceBar[]): {
+  shown: EvidenceBar[]
+  noData: EvidenceBar[]
+} {
+  const hasData = (b: EvidenceBar) => (b.total != null ? b.total > 0 : b.value > 0)
+  return { shown: bars.filter(hasData), noData: bars.filter((b) => !hasData(b)) }
+}
+
+/* De qué dimensión con procedencia depende cada patrón. La comida siempre es
+ * registro tuyo; sueño y entreno pueden venir del reloj. */
+const SOURCE_DIM: Record<string, 'sleep' | 'workout'> = {
+  'sleep-deficit': 'sleep',
+  'sleep-in-deficit': 'sleep',
+  'consistent-sleep': 'sleep',
+  'training-protein': 'workout',
+  'movement-deficit': 'workout',
+  'workout-type-deficit': 'workout',
+  'consistent-training': 'workout',
+}
+
+/**
+ * La fuente del hallazgo (ST-006, decisión de la dueña 13 oct 2026: nombrar
+ * AMBOS orígenes cuando los hay). "Con tus registros" si ningún día de la
+ * dimensión vino del reloj; "Con tus registros y tu smartwatch" si alguno sí.
+ * Solo procedencia: nunca cambia qué se detecta.
+ */
+export function patternSourceLine(patternId: string, signals: readonly DailySignals[]): string {
+  const dim = SOURCE_DIM[patternId]
+  const fromWatch =
+    dim === 'sleep'
+      ? signals.some((s) => s.sleep_minutes != null && s.sleep_source === 'wearable')
+      : dim === 'workout'
+        ? signals.some((s) => s.trained === true && s.workout_source === 'wearable')
+        : false
+  return fromWatch ? 'Con tus registros y tu smartwatch' : 'Con tus registros'
 }

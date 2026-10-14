@@ -73,8 +73,11 @@ import {
 import { isDeficitDay } from '../deficit'
 import {
   EVIDENCE_LABEL_TEXT,
+  evidenceUnknowns,
   monthPatternLabel,
   patternSampleLine,
+  patternSourceLine,
+  splitEvidenceBars,
   type EvidenceLabel,
   type PatternSample,
 } from '../evidence-label'
@@ -137,6 +140,10 @@ type EvidenceItem = {
   /** Contrato de evidencia (ST-005): qué tipo de afirmación es + su muestra. */
   evidenceLabel?: EvidenceLabel
   sample?: PatternSample
+  /** "Lo que todavía no sabemos" (ST-006): límites honestos del hallazgo. */
+  unknowns?: string[]
+  /** De dónde salen los datos: tus registros, o tus registros y el reloj. */
+  source?: string
 }
 
 /*
@@ -333,6 +340,13 @@ export function MonthSegment({
   // Madurez de datos (docs/orbita-maturity-spec.md): la sección promete solo
   // lo que sus días sostienen. Etapa por días CON DATOS, por dimensión.
   const maturity = useMemo(() => dataMaturity(patternSignals), [patternSignals])
+  // El detalle de evidencia de un patrón: su etiqueta y lo que aún no prueba.
+  const withEvidence = (p: MonthPattern): EvidenceItem => ({
+    ...p,
+    evidenceLabel: monthPatternLabel(p, maturity.stage),
+    unknowns: evidenceUnknowns(p, maturity.stage),
+    source: patternSourceLine(p.id, patternSignals),
+  })
   // "Lo que no sabías" (etapa 3+): el ranker de sorpresa elige UN protagonista;
   // lo esperado (el combo sueño + entreno) baja a "Lo que te sostiene".
   const surpriseTargets = useMacroTargets().data
@@ -640,7 +654,7 @@ export function MonthSegment({
     const id = consumeOrbitEvidence()
     if (!id) return
     const p = allPatterns.find((x) => x.id === id)
-    if (p) openEvidence({ ...p, evidenceLabel: monthPatternLabel(p, maturity.stage) })
+    if (p) openEvidence(withEvidence(p))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [evidenceFocused, longHistory, allPatterns])
   // El patrón dominante abre el modal cinemático a pantalla completa (no el panel).
@@ -963,12 +977,7 @@ export function MonthSegment({
                     {supportPatterns.map((p) => (
                       <Pressable
                         key={p.id}
-                        onPress={() =>
-                          openEvidence({
-                            ...p,
-                            evidenceLabel: monthPatternLabel(p, maturity.stage),
-                          })
-                        }
+                        onPress={() => openEvidence(withEvidence(p))}
                         style={({ pressed }) => [styles.alsoFoundRow, pressed && { opacity: 0.75 }]}
                         accessibilityRole="button"
                         accessibilityLabel={`${p.title} Ver la evidencia.`}
@@ -985,9 +994,7 @@ export function MonthSegment({
                     pattern={p}
                     label={monthPatternLabel(p, maturity.stage)}
                     index={i}
-                    onOpen={() =>
-                      openEvidence({ ...p, evidenceLabel: monthPatternLabel(p, maturity.stage) })
-                    }
+                    onOpen={() => openEvidence(withEvidence(p))}
                   />
                 ))}
               </>
@@ -2195,8 +2202,8 @@ function EvidenceModal({
   const ev = pattern?.evidence
   // Las señales SIN registro (0) no se dibujan como barra vacía (se leería como
   // hueco/falla): bajan a una nota al pie. La evidencia muestra lo que SÍ pasó.
-  const shown = ev ? ev.bars.filter((b) => b.value > 0) : []
-  const zeros = ev ? ev.bars.filter((b) => b.value === 0) : []
+  // "0 de 3 días" SÍ es evidencia (splitEvidenceBars); solo sin días baja.
+  const { shown, noData: zeros } = ev ? splitEvidenceBars(ev.bars) : { shown: [], noData: [] }
   const titleColor = ev
     ? (() => {
         const hi = ev.bars.find((b) => b.highlight) ?? ev.bars[0]
@@ -2232,6 +2239,7 @@ function EvidenceModal({
               {/* Qué se midió + las fechas concretas que anclan el conteo. */}
               <Text style={styles.evMeta}>{ev.caption}</Text>
               {sampleLine ? <Text style={styles.evMeta}>{sampleLine}</Text> : null}
+              {pattern.source ? <Text style={styles.evMeta}>{pattern.source}</Text> : null}
               {pattern.dates && pattern.dates.length > 0 ? (
                 <Text style={styles.modalDates}>{formatDates(pattern.dates)}</Text>
               ) : null}
@@ -2242,6 +2250,16 @@ function EvidenceModal({
               ) : null}
             </>
           )}
+          {pattern.unknowns && pattern.unknowns.length > 0 ? (
+            <View style={styles.evUnknowns}>
+              <Text style={styles.evUnknownsTitle}>Lo que todavía no sabemos</Text>
+              {pattern.unknowns.map((u) => (
+                <Text key={u} style={styles.evUnknown}>
+                  {u}
+                </Text>
+              ))}
+            </View>
+          ) : null}
         </View>
       ) : null}
     </StelarModal>
@@ -3397,6 +3415,26 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   // La frase serif es la protagonista: aquí vive el descubrimiento.
+  evUnknowns: {
+    marginTop: 18,
+    paddingTop: 14,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.hairline,
+    gap: 8,
+  },
+  evUnknownsTitle: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+    color: colors.niebla,
+  },
+  evUnknown: {
+    fontFamily: typography.ui,
+    fontSize: typography.sizes.body,
+    lineHeight: 21,
+    color: colors.bone,
+  },
   findingSample: {
     marginTop: 8,
     fontFamily: typography.uiMedium,

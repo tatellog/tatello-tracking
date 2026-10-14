@@ -1,9 +1,12 @@
 import {
   EARLY_MATURITY_MAX_STAGE,
   EVIDENCE_LABEL_TEXT,
+  evidenceUnknowns,
   monthPatternLabel,
   PATTERN_MIN_DAYS_PER_GROUP,
   patternSampleLine,
+  patternSourceLine,
+  splitEvidenceBars,
 } from '../evidence-label'
 import { detectMonthPatterns } from '../month-built'
 import { rankSurprises, rescueAfterOver, shortNightEffect } from '../surprise'
@@ -207,5 +210,99 @@ describe('cada sorpresa declara su muestra (mismos conteos con los que decide)',
     const all = [hero, ...others].filter((x): x is NonNullable<typeof x> => x != null)
     expect(all.length).toBeGreaterThan(0)
     for (const s of all) expect(patternSampleLine(s.sample)).not.toBeNull()
+  })
+})
+
+describe('evidenceUnknowns (ST-006 · lo que todavía no sabemos)', () => {
+  const s = (a: number, b: number) => ({
+    groups: [
+      { label: 'Con entreno', days: a },
+      { label: 'Sin entreno', days: b },
+    ],
+  })
+  const MATURE = EARLY_MATURITY_MAX_STAGE + 1
+
+  it('una constancia no declara límites: es un conteo', () => {
+    expect(evidenceUnknowns({ kind: 'discovery' }, MATURE)).toEqual([])
+  })
+
+  it('todo patrón dice que coincidir no es causar', () => {
+    const [first] = evidenceUnknowns({ kind: 'pattern', sample: s(8, 6) }, MATURE)
+    expect(first).toMatch(/no que una cosa cause la otra/)
+  })
+
+  it('patrón detectado: solo el límite de causa', () => {
+    expect(evidenceUnknowns({ kind: 'pattern', sample: s(8, 6) }, MATURE)).toHaveLength(1)
+  })
+
+  it('grupo chico: nombra el grupo y su conteo, y el mínimo', () => {
+    const out = evidenceUnknowns({ kind: 'pattern', sample: s(8, 3) }, MATURE)
+    expect(out[1]).toBe(
+      'Si se sostiene. Hay pocos días en un grupo (Sin entreno: 3); con 5 o más en cada uno sería patrón detectado.',
+    )
+  })
+
+  it('historia temprana con muestra suficiente: lo sigue mirando', () => {
+    const out = evidenceUnknowns({ kind: 'pattern', sample: s(8, 6) }, EARLY_MATURITY_MAX_STAGE)
+    expect(out[1]).toBe('Si se sostiene. Llevas pocos días con datos; lo sigo mirando.')
+  })
+
+  it('sin guion largo', () => {
+    const out = evidenceUnknowns({ kind: 'pattern', sample: s(2, 3) }, 1)
+    for (const line of out) expect(line).not.toMatch(/—/)
+  })
+})
+
+describe('splitEvidenceBars (ST-006 · "0 de 3" es evidencia, no un hueco)', () => {
+  it('una barra con días y 0 aciertos se dibuja', () => {
+    const { shown, noData } = splitEvidenceBars([
+      { label: 'Con entreno', value: 50, total: 8 },
+      { label: 'Sin entreno', value: 0, total: 3 },
+    ])
+    expect(shown.map((b) => b.label)).toEqual(['Con entreno', 'Sin entreno'])
+    expect(noData).toEqual([])
+  })
+
+  it('sin días en el grupo, baja a "aún sin registro"', () => {
+    const { shown, noData } = splitEvidenceBars([
+      { label: 'Con entreno', value: 50, total: 8 },
+      { label: 'Sin entreno', value: 0, total: 0 },
+    ])
+    expect(shown.map((b) => b.label)).toEqual(['Con entreno'])
+    expect(noData.map((b) => b.label)).toEqual(['Sin entreno'])
+  })
+
+  it('barras relativas sin denominador: el 0 sigue siendo sin registro', () => {
+    const { noData } = splitEvidenceBars([
+      { label: 'Agua', value: 0 },
+      { label: 'Sueño', value: 4 },
+    ])
+    expect(noData.map((b) => b.label)).toEqual(['Agua'])
+  })
+})
+
+describe('patternSourceLine (ST-006 · fuente: ambos registros)', () => {
+  it('sin días del reloj: tus registros', () => {
+    const signals = month(6, (i) => ({ trained: i % 2 === 0, workout_source: 'manual' }))
+    expect(patternSourceLine('movement-deficit', signals)).toBe('Con tus registros')
+  })
+
+  it('con algún entreno del reloj: nombra ambos', () => {
+    const signals = month(6, (i) => ({
+      trained: i % 2 === 0,
+      workout_source: i === 0 ? 'wearable' : 'manual',
+    }))
+    expect(patternSourceLine('movement-deficit', signals)).toBe('Con tus registros y tu smartwatch')
+  })
+
+  it('sueño del reloj cuenta para patrones de sueño, no para los de comida', () => {
+    const signals = month(6, () => ({ sleep_minutes: 420, sleep_source: 'wearable' }))
+    expect(patternSourceLine('sleep-deficit', signals)).toBe('Con tus registros y tu smartwatch')
+    expect(patternSourceLine('deficit-daytype', signals)).toBe('Con tus registros')
+  })
+
+  it('un día de descanso marcado por el reloj no hace "del reloj" un patrón de entreno', () => {
+    const signals = month(6, () => ({ trained: false, workout_source: 'wearable' }))
+    expect(patternSourceLine('training-protein', signals)).toBe('Con tus registros')
   })
 })
