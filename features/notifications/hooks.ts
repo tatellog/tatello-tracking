@@ -19,7 +19,7 @@ import {
   readFindingLedger,
   writeFindingLedgerEntry,
 } from './finding-push'
-import { weeklyReadingGuaranteed } from './invite'
+import { nextReadingDate, weeklyReadingGuaranteed } from './invite'
 import {
   syncCycleSealInvite,
   syncDayCloseInvite,
@@ -29,6 +29,9 @@ import {
   syncWeeklyReadingInvite,
   syncWeekSealInvite,
 } from './scheduler'
+
+const isoLocal = (dt: Date): string =>
+  `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`
 
 /*
  * Monta el scheduler de las invitaciones: en cada sesión (y cada vez que la
@@ -181,7 +184,12 @@ export function useWeeklyReadingInvite(): void {
 
   useEffect(() => {
     if (window === undefined || signals === undefined) return
-    const guaranteed = readingOn && weeklyReadingGuaranteed(signals, todayIso)
+    // La garantía se mide sobre la semana que lee el lunes en que va a sonar
+    // (hoy si es lunes y aún no es la hora; si no, el próximo).
+    const readingIso =
+      window != null && window !== 'not_yet' ? isoLocal(nextReadingDate(new Date(), window)) : null
+    const guaranteed =
+      readingOn && readingIso != null && weeklyReadingGuaranteed(signals, todayIso, readingIso)
     void syncWeeklyReadingInvite(window, guaranteed)
   }, [window, signals, todayIso, readingOn])
 }

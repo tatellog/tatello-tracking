@@ -7,7 +7,8 @@ import { queryKeys } from '@/lib/queryKeys'
 import { supabase } from '@/lib/supabase'
 import { todayInTimezone } from '@/lib/time'
 
-import { lastClosedWeekStart } from './weekly-reading'
+import { useIsoWeekSignals } from './hooks'
+import { lastClosedWeekStart, weekHasReading } from './weekly-reading'
 
 /*
  * Lectura Semanal (V-05) — hooks del lado cliente. La edge `weekly-reading`
@@ -62,8 +63,10 @@ export function useWeeklyReading(enabled: boolean) {
   return useQuery({
     queryKey: queryKeys.orbit.weeklyReading(uid ?? 'anon', weekStart),
     enabled: enabled && uid != null,
-    // Inmutable por diseño: una vez traída, no re-pedir en la sesión.
-    staleTime: Infinity,
+    // Inmutable por diseño: una vez traída, no re-pedir en la sesión. El
+    // silencio (reading null) SÍ se vuelve a pedir: la semana puede
+    // completarse por backfill, y no debe quedar guardado en disco (H9).
+    staleTime: (q) => (q.state.data?.reading == null ? 0 : Infinity),
     queryFn: async (): Promise<WeeklyReadingRow> => {
       const { data, error } = await supabase.functions.invoke('weekly-reading', {
         body: { todayIso: today },
@@ -94,4 +97,41 @@ export function useMarkWeeklyReadingOpened() {
       void qc.invalidateQueries({ queryKey: ['orbit', 'weeklyReading'] })
     },
   })
+}
+
+const StatusSchema = z.object({ opened_at: z.string().nullable() }).nullable()
+
+/**
+ * ¿Hay lectura de la última semana cerrada, y ya la abriste? SIN generarla
+ * (ST-010 · H8): la lectura se congela cuando la usuaria la toca, no cuando
+ * Hoy se monta. "Disponible" = la semana juntó los días mínimos (la misma
+ * regla del motor); "abierta" = su fila ya tiene opened_at (lectura directa
+ * de la tabla, RLS de la propia usuaria).
+ */
+export function useWeeklyReadingAvailability(enabled: boolean) {
+  const uid = useSession().session?.user?.id ?? null
+  const today = todayInTimezone()
+  const weekStart = lastClosedWeekStart(today)
+  const week = useIsoWeekSignals()
+  const status = useQuery({
+    queryKey: [...queryKeys.orbit.weeklyReading(uid ?? 'anon', weekStart), 'status'],
+    enabled: enabled && uid != null,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('weekly_readings')
+        .select('opened_at')
+        .eq('week_start', weekStart)
+        .maybeSingle()
+      if (error) throw error
+      return StatusSchema.parse(data)
+    },
+  })
+  const available = enabled && weekHasReading(week.data ?? [], weekStart)
+  return {
+    weekStart,
+    available,
+    /** Ya existe y está abierta (solo se sabe cuando la consulta respondió). */
+    opened: status.data?.opened_at != null,
+    loaded: status.isSuccess,
+  }
 }

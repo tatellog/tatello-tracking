@@ -11,6 +11,7 @@ import {
   nextCycleDate,
   nextInviteDate,
   nextReturnDate,
+  nextReadingDate,
   nextSealDate,
   ORBIT_PATTERN_COPY,
   PATTERN_COPY,
@@ -670,7 +671,8 @@ export async function syncWeeklyReadingInvite(
 
     await ensureChannels(Notifications)
 
-    const date = nextSealDate(new Date(), window)
+    // El mismo lunes que evaluó la garantía (hoy si aún no es la hora).
+    const date = nextReadingDate(new Date(), window)
     // ciclo > lectura: si el sello del ciclo suena ese mismo lunes, cede.
     const cycleFireAt = await scheduledFireAt(Notifications, CYCLE_ID)
     if (cycleFireAt && sameLocalDay(cycleFireAt, date)) return

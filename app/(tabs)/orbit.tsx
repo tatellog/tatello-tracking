@@ -20,6 +20,7 @@ import { useOrbitDayRollover } from '@/features/orbit/hooks'
 import { usePatternMemoryWriter } from '@/features/orbit/pattern-memory'
 import { consumeOrbitSegment } from '@/features/orbit/pending-segment'
 import { ScrollPauseContext } from '@/features/orbit/useScreenActive'
+import { WeeklyReadingRow } from '@/features/orbit/components/WeeklyReadingRow'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { LoadingView } from '@/components/LoadingView'
 import { SkyBackground, TabHeader } from '@/features/tabs/components'
@@ -341,6 +342,8 @@ function OrbitFeed({
   return (
     <Animated.View entering={FadeIn.duration(320).delay(60)}>
       <DayPresent key="feed-today" compact onOpenDay={onOpenDay} />
+      {/* La Lectura Semanal, para abrirla o releerla (ST-010). */}
+      <WeeklyReadingRow />
       <MonthSegment
         key="feed-patterns"
         view="patterns"

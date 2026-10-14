@@ -185,38 +185,63 @@ export function nextCycleDate(now: Date, window: Exclude<NotificationWindow, 'no
  * GANADA por definición: solo se agenda cuando la lectura del próximo lunes
  * ya está garantizada (ver weeklyReadingGuaranteed), nunca como recordatorio
  * vacío. El push no adelanta números ni la palanca: el contenido vive en
- * /weekly-reading, donde el tap aterriza directo. Lleva ✦ (política: la
- * estrella marca "hay algo GANADO esperándote", como N1/N4/N5).
- * (Pasa por voice-and-copy.)
+ * /weekly-reading, donde el tap aterriza directo. SIN ✦ (ST-010): la regla
+ * vigente reserva la estrella para lo que abre un chat con IA real, y la
+ * Lectura es 100% determinística. (Pasa por voice-and-copy.)
  */
 export const READING_COPY = {
   // Hace eco con la card destino ("Tu lectura está lista."); el body se
   // sostiene solo si el canal trunca el title, sin repetir el cierre de N1.
-  title: 'Tu lectura de la semana está lista ✦',
+  title: 'Tu lectura de la semana está lista',
   body: 'Tu semana pasada dejó algo que leer. Cuando quieras, aquí está.',
 } as const
 
 /**
- * ¿La lectura del PRÓXIMO lunes ya está garantizada? Sí cuando la semana EN
- * CURSO ya juntó los días mínimos con comida del motor compartido
- * (WEEKLY_READING_MIN_DAYS). Monotónico dentro de la semana — los días con
- * comida solo crecen — así que la promesa del push no puede romperse: al
- * llegar el lunes, buildWeeklyReading emitirá lectura (completa o parcial),
- * jamás silencio. `days` = filas de daily_signals (una por día).
+ * Cuándo suena N8: el lunes en la ventana elegida. Si HOY es lunes y la hora
+ * todavía no llega, suena hoy (anuncia la semana que acaba de cerrar); si
+ * no, el próximo lunes. Antes siempre apuntaba al próximo lunes, y abrir la
+ * app el lunes temprano cancelaba el push de ese mismo día (ST-010 · H3).
+ */
+export function nextReadingDate(now: Date, window: Exclude<NotificationWindow, 'not_yet'>): Date {
+  const t = WINDOW_TIME[window]
+  if (now.getDay() === 1) {
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), t.hour, t.minute)
+    if (today > now) return today
+  }
+  return nextSealDate(now, window)
+}
+
+const isoOf = (dt: Date): string =>
+  `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`
+
+/**
+ * ¿La lectura que se anuncia el lunes `readingIso` ya está garantizada? Sí
+ * cuando la semana que ESE lunes lee (los 7 días anteriores) ya juntó, hasta
+ * hoy, los días mínimos con comida del motor (WEEKLY_READING_MIN_DAYS).
+ * Monotónico dentro de la semana: los días con comida solo crecen, así que
+ * al llegar el lunes buildWeeklyReading emite lectura, jamás silencio.
+ * `days` = filas de daily_signals (una por día).
  */
 export function weeklyReadingGuaranteed(
   days: readonly { day: string | null; calories: number | null }[],
   todayIso: string,
+  readingIso: string,
 ): boolean {
-  const [y, m, d] = todayIso.split('-').map(Number) as [number, number, number]
+  const [y, m, d] = readingIso.split('-').map(Number) as [number, number, number]
   const dow = (new Date(y, m - 1, d, 12).getDay() + 6) % 7 // lunes = 0
-  const monday = new Date(y, m - 1, d - dow, 12)
-  const mm = String(monday.getMonth() + 1).padStart(2, '0')
-  const dd = String(monday.getDate()).padStart(2, '0')
-  const mondayIso = `${monday.getFullYear()}-${mm}-${dd}`
+  const readingMonday = new Date(y, m - 1, d - dow, 12)
+  const from = isoOf(new Date(y, m - 1, d - dow - 7, 12))
+  const to = isoOf(
+    new Date(
+      readingMonday.getFullYear(),
+      readingMonday.getMonth(),
+      readingMonday.getDate() - 1,
+      12,
+    ),
+  )
   let withFood = 0
   for (const s of days) {
-    if (s.day == null || s.day < mondayIso || s.day > todayIso) continue
+    if (s.day == null || s.day < from || s.day > to || s.day > todayIso) continue
     if (s.calories != null && s.calories > 0) withFood += 1
   }
   return withFood >= WEEKLY_READING_MIN_DAYS

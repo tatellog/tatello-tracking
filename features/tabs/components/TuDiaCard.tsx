@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeIn } from 'react-native-reanimated'
 
 import { EyebrowLabel } from '@/components/EyebrowLabel'
-import { useWeeklyReading } from '@/features/orbit/weekly-reading-hooks'
+import { useWeeklyReadingAvailability } from '@/features/orbit/weekly-reading-hooks'
 import { useSession } from '@/hooks/useSession'
 import { track } from '@/lib/analytics'
 import { aiEnabledForEmail, WEEKLY_READING_ENABLED } from '@/lib/featureFlags'
@@ -45,9 +45,9 @@ export function TuDiaCard({
   // DOBLE-gateada como toda la Lectura Semanal.
   const { session } = useSession()
   const readingOn = WEEKLY_READING_ENABLED && aiEnabledForEmail(session?.user?.email)
-  const weekly = useWeeklyReading(readingOn)
-  const weeklyReadingReady =
-    readingOn && weekly.data?.reading != null && weekly.data?.openedAt == null
+  // Avisa SIN generarla: se congela cuando la abres, no al montar Hoy (H8).
+  const weekly = useWeeklyReadingAvailability(readingOn)
+  const weeklyReadingReady = weekly.available && weekly.loaded && !weekly.opened
 
   const model = tuDiaModel({
     consumedCalories,
