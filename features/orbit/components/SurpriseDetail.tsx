@@ -336,6 +336,105 @@ function TodayBlock({ today, look }: { today: SurpriseToday; look: EvidenceLook 
   )
 }
 
+/* ── La tarjeta del feed ─────────────────────────────────────────────── */
+
+const CARD_RING = 84
+const CARD_STROKE = 9
+
+/** "Lo que no sabías" en el feed: la misma gramática que su detalle (íconos,
+ *  color del dato, anillo) en chico, para que tocarla abra lo que promete. */
+export function SurpriseCard({
+  surprise,
+  label,
+  source,
+  onOpen,
+}: {
+  surprise: Surprise
+  label: EvidenceLabel
+  source: string
+  onOpen: () => void
+}) {
+  const look = evidenceLook(surprise.id, colors.oro)
+  const compare = surprise.compare
+  const full = useSharedValue(1)
+  const strongRow = surprise.rows.find((r) => r.strong) ?? surprise.rows[0]
+  const otherLine = compare
+    ? `${compare.other.label}: ${compare.other.hits}\u00a0de\u00a0${compare.other.total}`
+    : (() => {
+        const o = surprise.rows.find((r) => r !== strongRow)
+        return o ? `${o.label}: ${o.value}` : null
+      })()
+  const total = surprise.sample
+    ? (surprise.sample.total ?? surprise.sample.groups.reduce((a, g) => a + g.days, 0))
+    : null
+  const evidenceLine = [total ? `${total} días comparados` : null, source.toLowerCase()]
+    .filter(Boolean)
+    .join(' · ')
+  return (
+    <Animated.View entering={FadeIn.duration(420)} style={styles.cardWrap}>
+      <Pressable
+        onPress={onOpen}
+        accessibilityRole="button"
+        accessibilityLabel={`Lo que no sabías. ${EVIDENCE_LABEL_TEXT[label]}. ${surprise.headline} ${evidenceLine}. Ver el detalle.`}
+        style={({ pressed }) => [
+          styles.card,
+          { borderColor: `${look.accent}40` },
+          pressed && { opacity: 0.85 },
+        ]}
+      >
+        <View style={styles.cardTop}>
+          <View style={styles.cardIcons}>
+            {look.icons.map((icon, i) => (
+              <View
+                key={icon.name}
+                style={[
+                  styles.cardIconDisc,
+                  { backgroundColor: `${icon.color}33` },
+                  i > 0 && styles.cardIconOverlap,
+                ]}
+              >
+                <MaterialCommunityIcons name={icon.name} size={17} color={icon.color} />
+              </View>
+            ))}
+          </View>
+          <Text style={[styles.cardEyebrow, { color: look.accent }]} numberOfLines={2}>
+            {`Lo que no sabías · ${EVIDENCE_LABEL_TEXT[label]}`}
+          </Text>
+        </View>
+        <View style={styles.cardBody}>
+          {compare ? (
+            <View style={{ width: CARD_RING, height: CARD_RING }}>
+              <Ring
+                size={CARD_RING}
+                stroke={CARD_STROKE}
+                color={look.accent}
+                track={`${look.accent}26`}
+                progress={full}
+                pct={compare.strong.total > 0 ? compare.strong.hits / compare.strong.total : 0}
+              />
+              <View style={styles.heroCenter} pointerEvents="none">
+                <Text style={styles.cardRingNum}>
+                  {compare.strong.hits}
+                  <Text style={styles.cardRingOf}>{`/${compare.strong.total}`}</Text>
+                </Text>
+              </View>
+            </View>
+          ) : strongRow ? (
+            <Text style={[styles.cardAvg, { color: look.accent }]}>{strongRow.value}</Text>
+          ) : null}
+          <Text style={styles.cardTitle}>{surprise.headline}</Text>
+        </View>
+        {otherLine ? <Text style={styles.cardOther}>{otherLine}</Text> : null}
+        <Text style={styles.cardEvidence}>{evidenceLine}</Text>
+        <View style={styles.cardCta}>
+          <Text style={[styles.cardCtaText, { color: look.accent }]}>Ver el detalle</Text>
+          <Text style={[styles.cardCtaText, { color: look.accent }]}>→</Text>
+        </View>
+      </Pressable>
+    </Animated.View>
+  )
+}
+
 /* ── La pantalla ────────────────────────────────────────────────────── */
 
 export function SurpriseDetailModal({
@@ -477,6 +576,75 @@ export function SurpriseDetailModal({
 }
 
 const styles = StyleSheet.create({
+  cardWrap: { marginTop: 4, marginBottom: 36 },
+  card: {
+    padding: 20,
+    borderRadius: 24,
+    borderWidth: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(244, 236, 222, 0.04)',
+    gap: 12,
+  },
+  cardTop: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  cardIcons: { flexDirection: 'row' },
+  cardIconDisc: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: colors.bg,
+  },
+  cardIconOverlap: { marginLeft: -8 },
+  cardEyebrow: {
+    flex: 1,
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.tinyLabel,
+    letterSpacing: 1.6,
+    textTransform: 'uppercase',
+  },
+  cardBody: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  cardRingNum: {
+    fontFamily: typography.displayHeavy,
+    fontSize: typography.sizes.displaySm,
+    color: colors.leche,
+    fontVariant: ['tabular-nums'],
+  },
+  cardRingOf: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    color: colors.niebla,
+  },
+  cardAvg: {
+    fontFamily: typography.displayHeavy,
+    fontSize: typography.sizes.displaySm,
+    fontVariant: ['tabular-nums'],
+  },
+  cardTitle: {
+    flex: 1,
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.heading,
+    lineHeight: 24,
+    letterSpacing: -0.2,
+    color: colors.leche,
+  },
+  cardOther: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    color: colors.bone,
+  },
+  cardEvidence: {
+    marginTop: -6,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    color: colors.niebla,
+  },
+  cardCta: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
+  cardCtaText: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.body,
+    letterSpacing: 0.4,
+  },
   root: { flex: 1, backgroundColor: colors.bg },
   scroll: { paddingHorizontal: 24, alignItems: 'center' },
   eyebrow: {

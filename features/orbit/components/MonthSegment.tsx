@@ -110,7 +110,7 @@ import { comboKey, combosBornRecently } from '../combo-memory'
 import { useSeenCombos } from '../combo-seen'
 import { useSurpriseRevealSeen } from '../surprise-seen'
 import { bedtimeOffsetMinutes } from '../bedtime'
-import { rankSurprises, surpriseToday, type Surprise } from '../surprise'
+import { rankSurprises, surpriseToday } from '../surprise'
 import { NotifyOfferSheet } from '@/features/notifications/components/NotifyOfferSheet'
 import { useNotifyOffer } from '@/features/notifications/offer'
 import { earlyReading } from '../early-readings'
@@ -118,7 +118,7 @@ import { dataMaturity } from '../maturity'
 import { useSaveReflection } from '../reflections'
 import { EvidenceChip, EvidenceComparison, EvidenceHeader } from './EvidenceHighlight'
 import { EmptySegmentCard } from './EmptySegmentCard'
-import { EvidenceUnknowns, SurpriseDetailModal, SurpriseRows } from './SurpriseDetail'
+import { EvidenceUnknowns, SurpriseCard, SurpriseDetailModal } from './SurpriseDetail'
 import { ComboChatView } from './ComboChatView'
 import { MonthChatSheet } from './MonthChatSheet'
 import { MonthGlanceCalendar } from './MonthGlanceCalendar'
@@ -911,12 +911,13 @@ export function MonthSegment({
             {combo || supportPatterns.length > 0 || surprise ? (
               <>
                 {surprise ? (
-                  <SurpriseHero
+                  <SurpriseCard
                     surprise={surprise}
                     label={monthPatternLabel(
                       { kind: 'pattern', sample: surprise.sample },
                       maturity.stage,
                     )}
+                    source={patternSourceLine(surprise.id, patternSignals)}
                     onOpen={() => {
                       setSurpriseFirst(surpriseSeen.isNew(surprise.id))
                       surpriseSeen.markSeen(surprise.id)
@@ -1665,50 +1666,6 @@ const NODE_COLOR: Record<string, string> = {
 function comboSentence(combo: WinningComboData): string {
   const list = comboHabitList(combo)
   return `${list.charAt(0).toUpperCase()}${list.slice(1)} el mismo día.`
-}
-
-/* "Lo que no sabías" — el protagonista del feed (etapa 3+), elegido por el
- * ranker de sorpresa: lo que ella NO sabía, no lo que más se repite. La frase
- * es el hallazgo; debajo, la comparación que lo prueba (dos filas, la fuerte
- * primero). Sin ✦: el motor lo encontró, no hay chat detrás (regla IA visible). */
-function SurpriseHero({
-  surprise,
-  label,
-  onOpen,
-}: {
-  surprise: Surprise
-  label: EvidenceLabel
-  onOpen: () => void
-}) {
-  const sampleLine = patternSampleLine(surprise.sample)
-  return (
-    <Animated.View entering={FadeIn.duration(420)} style={styles.surprise}>
-      <Pressable
-        onPress={onOpen}
-        accessibilityRole="button"
-        accessibilityLabel={`Lo que no sabías. ${EVIDENCE_LABEL_TEXT[label]}. ${surprise.headline} ${sampleLine ?? ''}. Ver el detalle.`}
-      >
-        <Text
-          style={styles.surpriseKicker}
-        >{`Lo que no sabías · ${EVIDENCE_LABEL_TEXT[label]}`}</Text>
-        {/* Procedencia a la vista: lo que sale del smartwatch lo dice ANTES de
-            la frase, para que nunca parezca que Stelar lo adivinó. */}
-        {surprise.fromWatch ? (
-          <View style={styles.surpriseSource}>
-            <WatchMark past inline={false} />
-            <Text style={styles.surpriseSourceText}>Con datos de tu smartwatch</Text>
-          </View>
-        ) : null}
-        <Text style={styles.surpriseHeadline}>{surprise.headline}</Text>
-        <SurpriseRows rows={surprise.rows} />
-        {sampleLine ? <Text style={styles.findingSample}>{sampleLine}</Text> : null}
-        <View style={styles.findingCta}>
-          <Text style={styles.findingCtaText}>Ver el detalle</Text>
-          <Text style={styles.findingCtaArrow}>→</Text>
-        </View>
-      </Pressable>
-    </Animated.View>
-  )
 }
 
 /* Tu día fuerte (dueña 29 sep 2026, ronda 2: "piensa como usuaria"). El
@@ -2512,36 +2469,6 @@ const styles = StyleSheet.create({
     paddingTop: 18,
     paddingBottom: 20,
     paddingHorizontal: 18,
-  },
-  surprise: {
-    marginTop: 4,
-    marginBottom: 36,
-  },
-  surpriseKicker: {
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.tinyLabel,
-    letterSpacing: 2,
-    textTransform: 'uppercase',
-    color: colors.oroSoft,
-  },
-  surpriseSource: {
-    marginTop: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  surpriseSourceText: {
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.label,
-    color: colors.niebla,
-  },
-  surpriseHeadline: {
-    marginTop: 12,
-    fontFamily: typography.uiSemi,
-    fontSize: typography.sizes.segmentTitle,
-    lineHeight: 30,
-    color: colors.leche,
-    letterSpacing: -0.2,
   },
   sustainEyebrow: {
     marginBottom: 6,

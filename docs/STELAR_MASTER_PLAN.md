@@ -614,6 +614,12 @@ Copy/paste the following into a Claude coding session:
 - **Push:** la dueña pidió subir la rama; el push desde la sesión fue denegado por permisos, queda para que lo corra ella.
 - **Next recommended ticket:** ST-007 (Hoy: hallazgo calificado destacado + estado vacío honesto).
 
+### 2026-10-13 — ST-006 corte 6 (tarjeta del feed con la gramática del detalle) — rama `master-plan-integrity`
+
+- **As-is:** la tarjeta "Lo que no sabías" seguía en oro, sin íconos ni anillo, con la frase pegada a las filas, y decía "Con datos de tu smartwatch" mientras el detalle decía "con tus registros y tu smartwatch".
+- **Cambio:** `SurpriseCard` en `SurpriseDetail.tsx` (reemplaza `SurpriseHero` de `MonthSegment.tsx`): marco con borde en el color del dato, íconos + eyebrow en ese color, anillo chico (o valor de promedio) junto a la frase, el otro lado, evidencia con la fuente unificada (`patternSourceLine`) y "Ver el detalle →".
+- **Tests:** jest 108 / 1348 ✓, tsc ✓, eslint ✓. **Visual:** simulador iOS, cuenta dev ✓ (margen inferior corregido después de la captura).
+
 ---
 
 ## 11. DECISION LOG — DO NOT SILENTLY REVERSE
