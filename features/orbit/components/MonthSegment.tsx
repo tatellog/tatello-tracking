@@ -81,6 +81,7 @@ import { evidenceChip, evidenceLook } from '../evidence-highlight'
 import { consumeOrbitEvidence } from '../pending-segment'
 import type { InsightFrom, InsightTarget } from '../insight-events'
 import { trackInsightOnce, trackInsightOpened } from '../insight-events-store'
+import { useInsightFeedback } from '../insight-feedback-store'
 import { weeklyMovementLever } from '../week-orbit-logic'
 import { comboChatHash, comboId, comboToFinding } from '../combo-chat'
 import {
@@ -113,6 +114,7 @@ import { useNotifyOffer } from '@/features/notifications/offer'
 import { useSaveReflection } from '../reflections'
 import { EvidenceChip, EvidenceComparison, EvidenceHeader } from './EvidenceHighlight'
 import { EmptySegmentCard } from './EmptySegmentCard'
+import { InsightFeedback, type InsightFeedbackProps } from './InsightFeedback'
 import { EvidenceUnknowns, SurpriseCard, SurpriseDetailModal } from './SurpriseDetail'
 import { ComboChatView } from './ComboChatView'
 import { MonthChatSheet } from './MonthChatSheet'
@@ -565,6 +567,20 @@ export function MonthSegment({
   const trackOpened = (id: string, from: InsightFrom, target: InsightTarget) => {
     const d = discovery.qualified.find((x) => x.id === id)
     if (d) trackInsightOpened(discovery.insightMetaOf(d), from, target)
+  }
+  // ST-008 corte 2 · "¿Esto coincide con tus días?" en el detalle de un
+  // hallazgo del feed. "No coincide" (y cualquier respuesta) lo saca de Hoy.
+  const insightFeedback = useInsightFeedback(seenUid)
+  const feedbackFor = (id: string | undefined): InsightFeedbackProps | undefined => {
+    const d = id ? discovery.qualified.find((x) => x.id === id) : undefined
+    if (!d) return undefined
+    return {
+      answer: insightFeedback.answerOf(d.id),
+      onAnswer: (answer) => {
+        insightFeedback.submit(d.id, answer, discovery.insightMetaOf(d))
+        hoyDiscovery.markOpened(d.id)
+      },
+    }
   }
   const openSurprise = (id: string, from: InsightFrom = 'descubre') => {
     trackOpened(id, from, 'surprise_detail')
@@ -1084,7 +1100,11 @@ export function MonthSegment({
         </Pressable>
       ) : null}
 
-      <EvidenceModal pattern={evidence} onClose={() => setEvidence(null)} />
+      <EvidenceModal
+        pattern={evidence}
+        feedback={feedbackFor(evidence?.id)}
+        onClose={() => setEvidence(null)}
+      />
       {surprise ? (
         <SurpriseDetailModal
           visible={surpriseOpen}
@@ -1097,6 +1117,7 @@ export function MonthSegment({
             patternSignals.find((x) => x.day === today),
           )}
           firstTime={surpriseFirst}
+          feedback={feedbackFor(surprise.id)}
           onClose={() => setSurpriseOpen(false)}
         />
       ) : null}
@@ -2129,9 +2150,12 @@ function WeekdayShapeChart({ shape }: { shape: WeekdayShape }) {
 /* ── "Ver evidencia" — las barras que sostienen un hallazgo ──────────── */
 function EvidenceModal({
   pattern,
+  feedback,
   onClose,
 }: {
   pattern: EvidenceItem | null
+  /** "¿Esto coincide con tus días?" (ST-008); solo en hallazgos del feed. */
+  feedback?: InsightFeedbackProps
   onClose: () => void
 }) {
   const ev = pattern?.evidence
@@ -2186,6 +2210,7 @@ function EvidenceModal({
             </>
           )}
           <EvidenceUnknowns lines={pattern.unknowns} />
+          {feedback ? <InsightFeedback {...feedback} /> : null}
         </View>
       ) : null}
     </StelarModal>

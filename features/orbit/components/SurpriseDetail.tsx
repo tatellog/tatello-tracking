@@ -42,6 +42,8 @@ import { EVIDENCE_LABEL_TEXT, type EvidenceLabel, type PatternSample } from '../
 import { evidenceLook, type EvidenceLook } from '../evidence-highlight'
 import type { Surprise, SurpriseSide, SurpriseToday } from '../surprise'
 
+import { InsightFeedback, type InsightFeedbackProps } from './InsightFeedback'
+
 const AnimatedCircle = Animated.createAnimatedComponent(Circle)
 
 const HERO = 232
@@ -494,6 +496,7 @@ export function SurpriseDetailModal({
   unknowns,
   today,
   firstTime,
+  feedback,
   onClose,
 }: {
   visible: boolean
@@ -504,6 +507,8 @@ export function SurpriseDetailModal({
   today: SurpriseToday | null
   /** Primera apertura de este hallazgo: la revelación completa. */
   firstTime: boolean
+  /** "¿Esto coincide con tus días?" (ST-008); sin él, no se pregunta. */
+  feedback?: InsightFeedbackProps
   onClose: () => void
 }) {
   const insets = useSafeAreaInsets()
@@ -592,6 +597,7 @@ export function SurpriseDetailModal({
               {today ? <TodayBlock today={today} look={look} /> : null}
               <Text style={styles.evidence}>{evidenceLine}</Text>
               <EvidenceUnknowns lines={unknowns} footnote />
+              {feedback ? <InsightFeedback {...feedback} /> : null}
             </Animated.View>
           ) : null}
         </ScrollView>
