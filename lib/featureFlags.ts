@@ -103,11 +103,20 @@ export const WEARABLE_MOCK_DATA = true
  * motor te devuelve gasto real + ritmo + una palanca (100% determinístico,
  * edge `weekly-reading`, tabla `weekly_readings` inmutable).
  *
- * DOBLE-gateada mientras se valida: este master + aiEnabledForEmail (dev).
- * Para abrir a beta: quitar el gate devOnly en la superficie (el motor no
- * gasta IA, así que abrirla no toca el presupuesto de OpenAI).
+ * Abierta a la BETA (dueña 14 oct 2026, ST-010): este master + (cuentas dev
+ * de aiEnabledForEmail O usuarias con profiles.is_beta). El motor no gasta
+ * IA, así que abrirla no toca el presupuesto de OpenAI. Killable a `false`.
  */
 export const WEEKLY_READING_ENABLED = true
+
+/** ¿Esta usuaria ve la Lectura Semanal? Dev + beta, bajo el master. */
+export function weeklyReadingEnabledFor(
+  email: string | null | undefined,
+  isBeta: boolean | null | undefined,
+): boolean {
+  if (!WEEKLY_READING_ENABLED) return false
+  return aiEnabledForEmail(email) || isBeta === true
+}
 
 /*
  * Hero vivo (roadmap V-13) — el emblema de Hoy reacciona (<1 s, sutil) cuando

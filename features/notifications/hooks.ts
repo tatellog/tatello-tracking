@@ -9,7 +9,7 @@ import { useRecentOrbitPattern } from '@/features/orbit/pattern-memory'
 import type { NotificationWindow } from '@/features/profile/api'
 import { useProfile } from '@/features/profile/hooks'
 import { useSession } from '@/hooks/useSession'
-import { aiEnabledForEmail, WEEKLY_READING_ENABLED } from '@/lib/featureFlags'
+import { aiEnabledForEmail, weeklyReadingEnabledFor } from '@/lib/featureFlags'
 import { queryKeys } from '@/lib/queryKeys'
 import { todayInTimezone } from '@/lib/time'
 
@@ -168,14 +168,14 @@ export function useFindingInvite(): void {
  * lunes habrá lectura (≥ días mínimos con comida — monotónico, la promesa no
  * se rompe), agenda el push del lunes con destino /weekly-reading. Lee la
  * MISMA query de señales que Órbita (cacheada, cero fetch extra) y se
- * re-sincroniza al cambiar la semana. DOBLE-gateada como toda la Lectura
- * Semanal (flag + dev): fuera del gate, guaranteed=false → cancela cualquier
+ * re-sincroniza al cambiar la semana. Mismo gate que toda la Lectura
+ * Semanal (dev + beta): fuera del gate, guaranteed=false → cancela cualquier
  * N8 agendado y no agenda nada.
  */
 export function useWeeklyReadingInvite(): void {
   const { session } = useSession()
-  const readingOn = WEEKLY_READING_ENABLED && aiEnabledForEmail(session?.user?.email)
   const { data: profile } = useProfile()
+  const readingOn = weeklyReadingEnabledFor(session?.user?.email, profile?.is_beta)
   const window = (profile ? (profile.notification_window ?? null) : undefined) as
     | NotificationWindow
     | null

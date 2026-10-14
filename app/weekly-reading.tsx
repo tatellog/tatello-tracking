@@ -6,11 +6,13 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 
 import { EyebrowLabel } from '@/components/EyebrowLabel'
 import { PrimaryCta } from '@/components/PrimaryCta'
-import { useMarkWeeklyReadingOpened, useWeeklyReading } from '@/features/orbit/weekly-reading-hooks'
+import {
+  useMarkWeeklyReadingOpened,
+  useWeeklyReading,
+  useWeeklyReadingOn,
+} from '@/features/orbit/weekly-reading-hooks'
 import { SkyBackground } from '@/features/tabs/components'
-import { useSession } from '@/hooks/useSession'
 import { track } from '@/lib/analytics'
-import { aiEnabledForEmail, WEEKLY_READING_ENABLED } from '@/lib/featureFlags'
 import { colors, typography } from '@/theme'
 
 /*
@@ -49,8 +51,7 @@ function rangeLabel(startIso: string, endIso: string): string {
 export default function WeeklyReadingScreen() {
   const router = useRouter()
   // Gate propio de la ruta (ST-010): fuera del gate no se pide ni se genera.
-  const { session } = useSession()
-  const readingOn = WEEKLY_READING_ENABLED && aiEnabledForEmail(session?.user?.email)
+  const readingOn = useWeeklyReadingOn()
   const { data, isLoading, isError, refetch } = useWeeklyReading(readingOn)
   const markOpened = useMarkWeeklyReadingOpened()
   const reading = data?.reading ?? null

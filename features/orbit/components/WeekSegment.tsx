@@ -14,8 +14,6 @@ import { useRouter } from 'expo-router'
 import { EmText } from '@/components/EmText'
 import { usePressFeedback } from '@/components/ui/interaction'
 import { useMacroTargets } from '@/features/macros/hooks'
-import { useSession } from '@/hooks/useSession'
-import { aiEnabledForEmail, WEEKLY_READING_ENABLED } from '@/lib/featureFlags'
 import { colors, typography } from '@/theme'
 import { WatchMark } from '@/features/wearables/components/WatchMark'
 
@@ -47,7 +45,7 @@ import {
 } from '../week-orbit-logic'
 import { consumeWeekFocus } from '../pending-week-focus'
 import { stepsRhythm } from '../steps'
-import { useWeeklyReading } from '../weekly-reading-hooks'
+import { useWeeklyReading, useWeeklyReadingOn } from '../weekly-reading-hooks'
 import { StelarModal } from '@/components/ui/StelarModal'
 import { EmptySegmentCard } from './EmptySegmentCard'
 import { WeekOrbitGalaxy } from './WeekOrbitGalaxy'
@@ -172,8 +170,7 @@ export function WeekSegment({
   // Tu lectura semanal (V-06) — DOBLE-gateada (flag + dev) mientras se
   // valida. Sin lectura (null = silencio honesto del motor) no hay card.
   const router = useRouter()
-  const { session } = useSession()
-  const readingOn = WEEKLY_READING_ENABLED && aiEnabledForEmail(session?.user?.email)
+  const readingOn = useWeeklyReadingOn()
   const weeklyReadingQ = useWeeklyReading(readingOn)
   const weeklyReading = weeklyReadingQ.data?.reading ?? null
   const weeklyReadingOpened = weeklyReadingQ.data?.openedAt != null

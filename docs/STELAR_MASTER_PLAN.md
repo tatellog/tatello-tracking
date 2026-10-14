@@ -708,6 +708,12 @@ Copy/paste the following into a Claude coding session:
   - Detalle propio `ComboDetailModal` (`SurpriseDetail.tsx`) con la gramática del de la sorpresa: pantalla completa, íconos (`comboIcons`), héroe = diferencia en kcal con dos barras estilo Destacados de Salud (sin kcal, anillo de días en déficit), frase, Hoy en chips, evidencia y días en una línea, límites al pie, "¿Coincide?" y "Listo". Desde Hoy, el combo abre este detalle.
 - **Tests:** jest 112 / 1389 ✓, tsc ✓, eslint ✓. **Visual:** simulador iOS, la dueña: "mucho mejor".
 
+### 2026-10-14 — ST-010 corte 2 (blindaje antes de la beta) — rama `master-plan-integrity`
+
+- **Cambio:** edge `weekly-reading` acepta `todayIso` solo a ±1 día de la fecha del servidor; migración `20261014150000_weekly_readings_opened_at_guard.sql` (auditada por rls-auditor: OK): `opened_at` nace null, solo pasa de null a `now()` del servidor y no cambia. `docs/weekly-reading-spec.md` al día (migraciones reales, entradas Hoy/Descubre, N8, reglas ST-010).
+- **Gate a la beta (decisión dueña 14 oct 2026):** `weeklyReadingEnabledFor(email, is_beta)` en `lib/featureFlags.ts` (master + dev O `profiles.is_beta`) y `useWeeklyReadingOn()` como única fuente para Hoy, Descubre, `/weekly-reading`, N8 y Semana. Test `lib/__tests__/weekly-reading-gate.test.ts`.
+- **Pendiente:** aplicar la migración y desplegar la edge (dueña); validar en dev build ANTES de que el build llegue a la beta.
+
 ---
 
 ## 11. DECISION LOG — DO NOT SILENTLY REVERSE

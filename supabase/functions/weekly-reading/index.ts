@@ -67,6 +67,13 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const parsed = RequestSchema.safeParse(await req.json().catch(() => ({})))
     if (!parsed.success) return json({ error: 'Petición inválida.' }, 400)
     const { todayIso, action } = parsed.data
+    // El "hoy" del teléfono solo vale a ±1 día del servidor (ST-010): las
+    // zonas horarias no se alejan más que eso. Un reloj adelantado no puede
+    // congelar la lectura de una semana que sigue abierta.
+    const serverToday = new Date().toISOString().slice(0, 10)
+    if (todayIso < isoAddDays(serverToday, -1) || todayIso > isoAddDays(serverToday, 1)) {
+      return json({ error: 'Petición inválida.' }, 400)
+    }
 
     const weekStart = lastClosedWeekStart(todayIso)
     const weekEnd = isoAddDays(weekStart, 6)

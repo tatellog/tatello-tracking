@@ -1,8 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { z } from 'zod'
 
+import { useProfile } from '@/features/profile/hooks'
 import { useSession } from '@/hooks/useSession'
 import { track } from '@/lib/analytics'
+import { weeklyReadingEnabledFor } from '@/lib/featureFlags'
 import { queryKeys } from '@/lib/queryKeys'
 import { supabase } from '@/lib/supabase'
 import { todayInTimezone } from '@/lib/time'
@@ -97,6 +99,14 @@ export function useMarkWeeklyReadingOpened() {
       void qc.invalidateQueries({ queryKey: ['orbit', 'weeklyReading'] })
     },
   })
+}
+
+/** El gate de la Lectura Semanal para la sesión actual (dev + beta). Una
+ *  sola fuente para Hoy, Descubre, la pantalla y N8. */
+export function useWeeklyReadingOn(): boolean {
+  const email = useSession().session?.user?.email
+  const isBeta = useProfile().data?.is_beta
+  return weeklyReadingEnabledFor(email, isBeta)
 }
 
 const StatusSchema = z.object({ opened_at: z.string().nullable() }).nullable()

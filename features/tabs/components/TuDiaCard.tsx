@@ -4,10 +4,11 @@ import { Pressable, StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeIn } from 'react-native-reanimated'
 
 import { EyebrowLabel } from '@/components/EyebrowLabel'
-import { useWeeklyReadingAvailability } from '@/features/orbit/weekly-reading-hooks'
-import { useSession } from '@/hooks/useSession'
+import {
+  useWeeklyReadingAvailability,
+  useWeeklyReadingOn,
+} from '@/features/orbit/weekly-reading-hooks'
 import { track } from '@/lib/analytics'
-import { aiEnabledForEmail, WEEKLY_READING_ENABLED } from '@/lib/featureFlags'
 import { colors, typography } from '@/theme'
 
 import { tuDiaModel } from '../tu-dia'
@@ -43,8 +44,7 @@ export function TuDiaCard({
   // Lectura Semanal (V-06): solo mientras hay lectura de la semana cerrada
   // sin abrir; la pantalla marca opened_at y la invalidación la apaga.
   // DOBLE-gateada como toda la Lectura Semanal.
-  const { session } = useSession()
-  const readingOn = WEEKLY_READING_ENABLED && aiEnabledForEmail(session?.user?.email)
+  const readingOn = useWeeklyReadingOn()
   // Avisa SIN generarla: se congela cuando la abres, no al montar Hoy (H8).
   const weekly = useWeeklyReadingAvailability(readingOn)
   const weeklyReadingReady = weekly.available && weekly.loaded && !weekly.opened

@@ -3,21 +3,18 @@
  * o volver a leerla mientras la semana pasada tenga lectura. Antes vivía en
  * Órbita › Semana, que dejó de montarse con el feed de un solo scroll, y la
  * tarjeta de Hoy se va al abrirla: no había forma de releerla. Sin ✦: la
- * Lectura es determinística. Doble gate como toda la Lectura Semanal.
+ * Lectura es determinística. Mismo gate que toda la Lectura (dev + beta).
  */
 import { useRouter } from 'expo-router'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 
-import { useSession } from '@/hooks/useSession'
-import { aiEnabledForEmail, WEEKLY_READING_ENABLED } from '@/lib/featureFlags'
 import { colors, radius, typography } from '@/theme'
 
-import { useWeeklyReadingAvailability } from '../weekly-reading-hooks'
+import { useWeeklyReadingAvailability, useWeeklyReadingOn } from '../weekly-reading-hooks'
 
 export function WeeklyReadingRow() {
   const router = useRouter()
-  const { session } = useSession()
-  const readingOn = WEEKLY_READING_ENABLED && aiEnabledForEmail(session?.user?.email)
+  const readingOn = useWeeklyReadingOn()
   const weekly = useWeeklyReadingAvailability(readingOn)
   if (!weekly.available) return null
   return (
