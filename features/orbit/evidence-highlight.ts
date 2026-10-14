@@ -71,6 +71,18 @@ const LOOKS: Record<string, EvidenceLook> = {
   'late-bedtime': { kicker: 'Sueño', accent: colors.dimension.sueno, icons: [DORMIRSE, DEFICIT] },
 }
 
+/** Los íconos de "Tu día fuerte": cada hábito del combo + el déficit al que
+ *  van de la mano (la misma gramática que los Destacados de los patrones). */
+export function comboIcons(keys: readonly string[]): EvidenceIcon[] {
+  const BY_KEY: Record<string, EvidenceIcon> = {
+    sueno: SUENO,
+    cuerpo: ENTRENO,
+    proteina: PROTEINA,
+    comida: COMIDA,
+  }
+  return [...keys.map((k) => BY_KEY[k]).filter((x): x is EvidenceIcon => x != null), DEFICIT]
+}
+
 /** Patrones de exceso: sin chip de diferencia (ni festejo ni señalamiento). */
 const NO_CHIP = new Set(['surplus-concentration', 'weekend-surplus', 'second-half'])
 

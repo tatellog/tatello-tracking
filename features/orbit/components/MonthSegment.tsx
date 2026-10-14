@@ -1,13 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import {
-  Dimensions,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-  type LayoutChangeEvent,
-} from 'react-native'
+import { Dimensions, Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native'
 import Animated, {
   cancelAnimation,
   Easing,
@@ -37,7 +29,6 @@ import { signName, zodiacFromDate } from '@/features/tabs/zodiac'
 import type { ZodiacSign } from '@/features/tabs/zodiac/types'
 import { todayInTimezone } from '@/lib/time'
 import { WatchMark } from '@/features/wearables/components/WatchMark'
-import { formatSleepShort } from '@/features/wearables/recovery'
 import { AiCta } from '@/components/AiCta'
 import { useSession } from '@/hooks/useSession'
 import { aiEnabledForEmail } from '@/lib/featureFlags'
@@ -77,7 +68,7 @@ import {
   type PatternSample,
 } from '../evidence-label'
 import { StelarModal } from '@/components/ui/StelarModal'
-import { evidenceChip, evidenceLook } from '../evidence-highlight'
+import { comboIcons, evidenceChip, evidenceLook } from '../evidence-highlight'
 import { consumeOrbitEvidence } from '../pending-segment'
 import type { InsightFrom, InsightTarget } from '../insight-events'
 import { trackInsightOnce, trackInsightOpened } from '../insight-events-store'
@@ -98,7 +89,6 @@ import {
   comboWeekLine,
   comboWeekMeter,
   fmtKcalDelta,
-  type ComboDayCard,
   type ComboKcalGap,
   type ComboTodayHabit,
   type ComboWeekMeter,
@@ -115,7 +105,12 @@ import { useSaveReflection } from '../reflections'
 import { EvidenceChip, EvidenceComparison, EvidenceHeader } from './EvidenceHighlight'
 import { EmptySegmentCard } from './EmptySegmentCard'
 import { InsightFeedback, type InsightFeedbackProps } from './InsightFeedback'
-import { EvidenceUnknowns, SurpriseCard, SurpriseDetailModal } from './SurpriseDetail'
+import {
+  ComboDetailModal,
+  EvidenceUnknowns,
+  SurpriseCard,
+  SurpriseDetailModal,
+} from './SurpriseDetail'
 import { ComboChatView } from './ComboChatView'
 import { MonthChatSheet } from './MonthChatSheet'
 import { MonthGlanceCalendar } from './MonthGlanceCalendar'
@@ -338,7 +333,6 @@ export function MonthSegment({
     firstSignal,
     seenUid,
     seenCombos,
-    recentCombos,
     combo,
     allPatterns,
     supportPatterns,
@@ -501,7 +495,7 @@ export function MonthSegment({
   // días mostrados, aunque abarque dos meses.
   const reveals = useMemo(
     () => monthReveals(signals, { calorieTarget, proteinTarget, waterGoalGlasses, openDay: today }),
-    [signals, calorieTarget, proteinTarget, waterGoalGlasses],
+    [signals, calorieTarget, proteinTarget, waterGoalGlasses, today],
   )
   // Tendencia del déficit vs tu mes pasado (Apple Trends, self-only). SOLO al
   // alza y SIN número: mes cerrado = evidencia retrospectiva → la dirección sí, el
@@ -533,7 +527,7 @@ export function MonthSegment({
   // "déficit total", pero como conclusión, no como suma gastable).
   const deficitSummary = useMemo(
     () => daysInDeficit(signals, { calorieTarget, openDay: today }),
-    [signals, calorieTarget],
+    [signals, calorieTarget, today],
   )
   // Dirección del déficit DENTRO del mes (inicio vs final) — la flecha "Trends"
   // de Apple: responde "¿voy bien?" comparándote CONTIGO, no contra un 100% que
@@ -582,6 +576,65 @@ export function MonthSegment({
       },
     }
   }
+  // El detalle de "Tu día fuerte": la prueba completa, fuera de la tarjeta.
+  const [strongDetailOpen, setStrongDetailOpen] = useState(false)
+  const openStrongDetail = (from: InsightFrom) => {
+    if (shownKey) {
+      trackOpened(shownKey, from, 'evidence')
+      hoyDiscovery.markOpened(shownKey)
+    }
+    setStrongDetailOpen(true)
+  }
+  // Lo que enseña el detalle de "Tu día fuerte", con la MISMA muestra que su
+  // tarjeta (la etiqueta no puede decir otra cosa que la tarjeta).
+  const comboDetailProps = (c: NonNullable<typeof combo>) => {
+    const opts = { calorieTarget, proteinTarget, waterGoalGlasses }
+    const gap = comboKcalGap(patternSignals, c, opts)
+    const sample = comboEvidenceSample(c, gap)
+    const label = monthPatternLabel({ kind: 'pattern', sample }, maturity.stage)
+    const withLabel = c.signals.length === 2 ? 'Con los dos' : 'Con el patrón'
+    const below = (d: number) => Math.max(0, -d)
+    const barMax = gap ? Math.max(1, below(gap.withAvg), below(gap.restAvg)) : 1
+    const days = comboDayCards(patternSignals, c, opts).slice(0, 5)
+    return {
+      eyebrow: `Tu día fuerte · ${EVIDENCE_LABEL_TEXT[label]}`,
+      icons: comboIcons(c.signals.map((x) => x.key)),
+      hero: gap
+        ? {
+            kind: 'gap' as const,
+            value: fmtKcalDelta(gap.restAvg - gap.withAvg).slice(1),
+            caption: 'más abajo que tus otros días',
+            bars: [
+              {
+                label: withLabel,
+                value: fmtKcalDelta(gap.withAvg),
+                pct: below(gap.withAvg) / barMax,
+                strong: true,
+              },
+              {
+                label: 'Otros días',
+                value: fmtKcalDelta(gap.restAvg),
+                pct: below(gap.restAvg) / barMax,
+                strong: false,
+              },
+            ],
+          }
+        : {
+            kind: 'rate' as const,
+            strong: { label: withLabel, hits: c.deficits, total: c.occurrences, days: [] },
+            other: { label: 'Otros días', hits: c.restDeficits, total: c.restDays, days: [] },
+          },
+      title: comboPhrase(c),
+      today: comboToday(patternSignals, c, opts, today).map((h) => ({
+        label: HABIT_TILE[h.key] ?? h.key,
+        value: h.value ?? 'Sin registro',
+        on: h.status === 'on',
+      })),
+      evidenceLine: patternSampleLine(sample),
+      daysLine: days.length > 0 ? `Tus días así: ${days.map((d) => d.label).join(', ')}` : null,
+      unknowns: evidenceUnknowns({ kind: 'pattern', sample }, maturity.stage),
+    }
+  }
   const openSurprise = (id: string, from: InsightFrom = 'descubre') => {
     trackOpened(id, from, 'surprise_detail')
     hoyDiscovery.markOpened(id)
@@ -618,7 +671,7 @@ export function MonthSegment({
     }
     const p = allPatterns.find((x) => x.id === id)
     if (p) openEvidence(withEvidence(p), from)
-    else if (id === shownKey) trackOpened(id, from, 'feed_card')
+    else if (id === shownKey) openStrongDetail(from)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [evidenceFocused, discovery.loaded, allPatterns, surprise])
   // ST-008 · el protagonista del feed estuvo a la vista: una vez al día.
@@ -887,12 +940,12 @@ export function MonthSegment({
                       { kind: 'pattern', sample: surprise.sample },
                       maturity.stage,
                     )}
-                    source={patternSourceLine(surprise.id, patternSignals)}
+                    today={surpriseToday(
+                      surprise,
+                      patternSignals.find((x) => x.day === today),
+                    )}
                     onOpen={() => openSurprise(surprise.id)}
                   />
-                ) : null}
-                {surprise && combo ? (
-                  <Text style={[styles.eyebrow, styles.sustainEyebrow]}>Lo que te sostiene</Text>
                 ) : null}
                 {(combo || surprise) && view === 'patterns' ? null : (
                   <Text style={styles.sectionLede}>
@@ -905,7 +958,6 @@ export function MonthSegment({
                   <StrongDayCard
                     combo={combo}
                     maturityStage={maturity.stage}
-                    discovered={shownKey != null && recentCombos.includes(shownKey)}
                     meter={comboWeekMeter(week)}
                     todayHabits={comboToday(
                       patternSignals,
@@ -918,11 +970,6 @@ export function MonthSegment({
                       proteinTarget,
                       waterGoalGlasses,
                     })}
-                    dayCards={comboDayCards(patternSignals, combo, {
-                      calorieTarget,
-                      proteinTarget,
-                      waterGoalGlasses,
-                    })}
                     talked={comboTalk.transcript != null}
                     onAsk={aiOn && comboFinding ? () => openChat(null) : undefined}
                     onReveal={() => {
@@ -930,6 +977,7 @@ export function MonthSegment({
                       const base = comboReveal(combo)
                       setReveal({ ...base, takeaway: comboLever ?? base.takeaway })
                     }}
+                    onOpenDetail={() => openStrongDetail('descubre')}
                     onLog={(key) => router.push(key === 'proteina' ? '/meals' : '/')}
                   />
                 ) : null}
@@ -1100,6 +1148,14 @@ export function MonthSegment({
         </Pressable>
       ) : null}
 
+      {combo ? (
+        <ComboDetailModal
+          visible={strongDetailOpen}
+          {...comboDetailProps(combo)}
+          feedback={feedbackFor(shownKey ?? undefined)}
+          onClose={() => setStrongDetailOpen(false)}
+        />
+      ) : null}
       <EvidenceModal
         pattern={evidence}
         feedback={feedbackFor(evidence?.id)}
@@ -1669,28 +1725,26 @@ const NUM_WORD = ['cero', 'una', 'dos', 'tres', 'cuatro']
 function StrongDayCard({
   combo,
   maturityStage,
-  discovered,
   meter,
   todayHabits,
   gap,
-  dayCards,
   talked,
   onAsk,
   onReveal,
+  onOpenDetail,
   onLog,
 }: {
   combo: WinningComboData
   /** Madurez de los datos: junto con la muestra decide la etiqueta (ST-005). */
   maturityStage: number
-  /** Recién encontrado: tus días reales abren desplegados (la prueba manda). */
-  discovered: boolean
   meter: ComboWeekMeter | null
   todayHabits: ComboTodayHabit[]
   gap: ComboKcalGap | null
-  dayCards: ComboDayCard[]
   talked?: boolean
   onAsk?: () => void
   onReveal: () => void
+  /** La prueba completa (barras, muestra, tus días, límites): su detalle. */
+  onOpenDetail: () => void
   /** Anotar un hábito que falta (lleva a donde se registra). */
   onLog: (key: string) => void
 }) {
@@ -1706,8 +1760,6 @@ function StrongDayCard({
   const done = total > 0 && onCount === total
   const rested = todayHabits.some((h) => h.status === 'rest')
   const closed = todayHabits.some((h) => h.status === 'closed')
-  const [showDays, setShowDays] = useState(discovered)
-
   // Háptico SOLO al armarlo con la tarjeta abierta (no cada vez que se entra).
   const wasDone = useRef(done)
   useEffect(() => {
@@ -1717,14 +1769,10 @@ function StrongDayCard({
     wasDone.current = done
   }, [done])
 
-  const withLabel = total === 2 ? 'Con los dos' : 'Con el patrón'
   // La muestra es la que la tarjeta ENSEÑA (compartida con el destacado de Hoy).
   const sample = comboEvidenceSample(combo, gap)
   const evidence =
     EVIDENCE_LABEL_TEXT[monthPatternLabel({ kind: 'pattern', sample }, maturityStage)]
-  const sampleLine = patternSampleLine(sample)
-  // ST-006: los límites del combo con la MISMA muestra que enseña la tarjeta.
-  const unknowns = evidenceUnknowns({ kind: 'pattern', sample }, maturityStage)
   const kicker = done ? '★ Día fuerte armado' : `Tu día fuerte · ${evidence}`
   const headline = done
     ? 'Hoy lo juntaste.'
@@ -1737,11 +1785,6 @@ function StrongDayCard({
           : total === 2
             ? 'Vas a la mitad.'
             : `Llevas ${onCount} de ${total}.`
-  // Barras de la prueba: cuánto quedas ABAJO de tu meta (arriba = barra mínima).
-  const below = (d: number) => Math.max(0, -d)
-  const barMax = gap ? Math.max(1, below(gap.withAvg), below(gap.restAvg)) : 1
-  const barW = (d: number) => `${Math.max(3, Math.round((below(d) / barMax) * 100))}%` as const
-
   return (
     <Animated.View
       entering={FadeIn.duration(420)}
@@ -1862,7 +1905,7 @@ function StrongDayCard({
         <View
           style={styles.sdGap}
           accessible
-          accessibilityLabel={`${comboGroupLabel(combo)} quedas ${gap.restAvg - gap.withAvg} kcal más abajo que tus otros días. Contra tu meta, en promedio: ${fmtKcalDelta(gap.withAvg)} con los dos, ${fmtKcalDelta(gap.restAvg)} otros días.`}
+          accessibilityLabel={`${comboGroupLabel(combo)} quedas ${gap.restAvg - gap.withAvg} kcal más abajo que tus otros días.`}
         >
           <Text style={styles.sdGapLead}>{`${comboGroupLabel(combo)} quedas`}</Text>
           <Text style={styles.sdGapHero}>
@@ -1870,25 +1913,6 @@ function StrongDayCard({
             <Text style={styles.sdGapHeroUnit}> más abajo</Text>
           </Text>
           <Text style={styles.sdGapLead}>que tus otros días.</Text>
-          <View style={styles.sdBars}>
-            <View style={styles.sdBarRow}>
-              <Text style={[styles.sdBarLabel, styles.sdLabelOn]}>{withLabel}</Text>
-              <View style={styles.sdBarTrack}>
-                <View
-                  style={[styles.sdBarFill, styles.sdBarFillGold, { width: barW(gap.withAvg) }]}
-                />
-              </View>
-              <Text style={[styles.sdBarValue, styles.sdLabelOn]}>{fmtKcalDelta(gap.withAvg)}</Text>
-            </View>
-            <View style={styles.sdBarRow}>
-              <Text style={styles.sdBarLabel}>Otros días</Text>
-              <View style={styles.sdBarTrack}>
-                <View style={[styles.sdBarFill, { width: barW(gap.restAvg) }]} />
-              </View>
-              <Text style={styles.sdBarValue}>{fmtKcalDelta(gap.restAvg)}</Text>
-            </View>
-          </View>
-          <Text style={styles.sdGapCaption}>Contra tu meta de calorías, en promedio</Text>
         </View>
       ) : (
         <Text style={[styles.sdGapCaption, { marginTop: 18 }]}>
@@ -1896,73 +1920,17 @@ function StrongDayCard({
         </Text>
       )}
 
-      {sampleLine ? <Text style={styles.findingSample}>{sampleLine}</Text> : null}
-
-      {/* Tus días reales: sección con su "Ver todos", como en Salud. */}
-      {dayCards.length > 0 ? (
-        <>
-          <View style={styles.sdDaysHead}>
-            <Text style={styles.sdDaysTitle}>Tus días así</Text>
-            <Pressable
-              onPress={() => setShowDays((v) => !v)}
-              hitSlop={10}
-              accessibilityRole="button"
-              accessibilityLabel={showDays ? 'Ocultar tus días así' : 'Ver todos tus días así'}
-            >
-              <Text style={styles.sdDaysAction}>{showDays ? 'Ocultar' : 'Ver todos ›'}</Text>
-            </Pressable>
-          </View>
-          {showDays ? (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.sdCards}
-              style={styles.sdCardsScroll}
-            >
-              {dayCards.map((d) => (
-                <View
-                  key={d.day}
-                  style={styles.sdCard}
-                  accessible
-                  accessibilityLabel={[
-                    d.label,
-                    d.sleepMinutes != null ? `dormiste ${formatSleepShort(d.sleepMinutes)}` : null,
-                    d.workout ? `entreno ${d.workout}` : null,
-                    d.deficit === true
-                      ? 'en déficit'
-                      : d.deficit === false
-                        ? 'sobre tu meta'
-                        : null,
-                  ]
-                    .filter(Boolean)
-                    .join(', ')}
-                >
-                  <Text style={styles.sdCardDay}>{d.label}</Text>
-                  {d.sleepMinutes != null ? (
-                    <Text style={styles.sdCardText}>
-                      <Text style={{ color: NODE_COLOR.sueno }}>☾ </Text>
-                      {formatSleepShort(d.sleepMinutes)}
-                    </Text>
-                  ) : null}
-                  {d.workout ? (
-                    <Text style={styles.sdCardText}>
-                      <Text style={{ color: NODE_COLOR.cuerpo }}>✦ </Text>
-                      {d.workout}
-                    </Text>
-                  ) : null}
-                  {d.deficit != null ? (
-                    <Text style={[styles.sdCardBadge, d.deficit && styles.sdCardBadgeGold]}>
-                      {d.deficit ? '◆ En déficit' : '◇ Sobre tu meta'}
-                    </Text>
-                  ) : null}
-                </View>
-              ))}
-            </ScrollView>
-          ) : null}
-        </>
-      ) : null}
-
-      <EvidenceUnknowns lines={unknowns} footnote />
+      {/* La prueba completa vive en su detalle (dueña 14 oct 2026: la tarjeta
+          se lee en ~3 s; barras, muestra, tus días y límites a un toque). */}
+      <Pressable
+        onPress={onOpenDetail}
+        hitSlop={8}
+        accessibilityRole="button"
+        accessibilityLabel={`Tu día fuerte, ${evidence}. Ver el detalle.`}
+        style={({ pressed }) => [styles.sdDetailCta, pressed && { opacity: 0.75 }]}
+      >
+        <Text style={styles.sdDetailCtaText}>Ver el detalle →</Text>
+      </Pressable>
 
       {/* La IA: la píldora con borde aurora (el degradado del chat), sin
           relleno magenta. La dueña la prefirió sobre la fila discreta. */}
@@ -2420,6 +2388,12 @@ function AuroraCta({ label, onPress }: { label: string; onPress: () => void }) {
 }
 
 const styles = StyleSheet.create({
+  sdDetailCta: { alignSelf: 'flex-start', marginTop: 16, minHeight: 44, justifyContent: 'center' },
+  sdDetailCtaText: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.body,
+    color: colors.oroSoft,
+  },
   // El patrón vive en su propio contenedor (misma familia que el panel del
   // calendario) con un filo de oro apenas: es EL hallazgo, no texto suelto.
   heroPattern: {

@@ -699,6 +699,15 @@ Copy/paste the following into a Claude coding session:
 - **Tests:** jest 112 / 1389 ✓, tsc ✓, eslint ✓. **Visual:** no verificado. **Deploy pendiente:** edge `weekly-reading` (el motor cambió).
 - **Falta para beta controlada:** deploy de la edge; validar en dev build (pantalla, Hoy, Descubre y N8); validar `todayIso` en el server (±1 día) y blindar `opened_at` (bajos); actualizar `docs/weekly-reading-spec.md`; abrir el gate a la lista de la beta (no a todas).
 
+### 2026-10-14 — Descubre se lee en 3 segundos (fuera de ticket, pedido por la dueña) — rama `master-plan-integrity`
+
+- **Pedido de la dueña:** "es demasiada lectura, yo no pagaría por esto". Revisado con product-benchmark y uxui-specialist. La dueña RECHAZÓ quitar el multiring y el calendario ("¿enserio vas a quitar lo de valor?"): se recorta TEXTO, nunca los visuales.
+- **Cambio:**
+  - "Lo que no sabías" (`SurpriseCard`): etiqueta, anillo, frase, el contraste ("Menos pasos: 1 de 11") y "Ver el detalle"; la muestra y la fuente pasan al detalle; nueva línea de HOY (`surpriseToday`) cuando hay dato de hoy.
+  - "Tu día fuerte" (`StrongDayCard`): etiqueta, frase, mosaicos de hoy, número héroe y "Ver el detalle →"; sin el eyebrow "Lo que te sostiene".
+  - Detalle propio `ComboDetailModal` (`SurpriseDetail.tsx`) con la gramática del de la sorpresa: pantalla completa, íconos (`comboIcons`), héroe = diferencia en kcal con dos barras estilo Destacados de Salud (sin kcal, anillo de días en déficit), frase, Hoy en chips, evidencia y días en una línea, límites al pie, "¿Coincide?" y "Listo". Desde Hoy, el combo abre este detalle.
+- **Tests:** jest 112 / 1389 ✓, tsc ✓, eslint ✓. **Visual:** simulador iOS, la dueña: "mucho mejor".
+
 ---
 
 ## 11. DECISION LOG — DO NOT SILENTLY REVERSE
@@ -726,6 +735,7 @@ Copy/paste the following into a Claude coding session:
 | 2026-10-14 | Los "N de M días" de Progreso cuentan desde que empezaste (primer día con datos); hoy entra solo si ya tiene el dato; "mejoró" compara proporciones                               | Decisión de la dueña (ST-009): "4 de 30" se lee como fallaste 26                                                                                                       | —                                                                                   |
 | 2026-10-14 | El promedio de proteína usa solo días completos (`countsForProteinAverage`)                                                                                                       | Decisión de la dueña (ST-009), misma regla que P12 para kcal                                                                                                           | —                                                                                   |
 | 2026-10-14 | Lectura Semanal: el ritmo en kg solo con TDEE sólido y promedio de días completos; se congela al tocarla (Hoy avisa sin generar); se relee desde una fila en Descubre             | Decisión de la dueña (ST-010); P-06 del plan                                                                                                                           | —                                                                                   |
+| 2026-10-14 | En Descubre cada tarjeta se lee en ~3 s; la evidencia vive en el detalle. El multiring y el calendario se quedan                                                                  | Decisión de la dueña ("demasiada lectura"; "¿enserio vas a quitar lo de valor?")                                                                                       | —                                                                                   |
 | 2026-10-13 | Plan maestro vive en `docs/STELAR_MASTER_PLAN.md` (copia del original en Downloads)                                                                                               | Persistir el ledger con el repo                                                                                                                                        | —                                                                                   |
 
 ---

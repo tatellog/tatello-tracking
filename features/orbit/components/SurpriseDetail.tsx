@@ -39,7 +39,7 @@ import Svg, { Circle, Defs, RadialGradient, Stop } from 'react-native-svg'
 import { colors, typography } from '@/theme'
 
 import { EVIDENCE_LABEL_TEXT, type EvidenceLabel, type PatternSample } from '../evidence-label'
-import { evidenceLook, type EvidenceLook } from '../evidence-highlight'
+import { evidenceLook, type EvidenceIcon, type EvidenceLook } from '../evidence-highlight'
 import type { Surprise, SurpriseSide, SurpriseToday } from '../surprise'
 
 import { InsightFeedback, type InsightFeedbackProps } from './InsightFeedback'
@@ -344,8 +344,9 @@ const CARD_RING = 84
 const CARD_STROKE = 9
 
 /** La tarjeta de un hallazgo: íconos + eyebrow en el color del dato, anillo
- *  chico (o valor de promedio) junto a la frase, el otro lado, la evidencia en
- *  una línea y el CTA. Base común de "Lo que no sabías" y del destacado de Hoy. */
+ *  chico (o valor de promedio) junto a la frase, el otro lado, dónde vas HOY y
+ *  el CTA. Se lee en ~3 s (dueña 14 oct 2026: "demasiada lectura"): la muestra
+ *  y la fuente viven en el detalle, a un toque. */
 export function DiscoveryCard({
   look,
   eyebrow,
@@ -353,7 +354,7 @@ export function DiscoveryCard({
   ring,
   avgValue,
   otherLine,
-  evidenceLine,
+  todayLine,
   ctaLabel,
   onOpen,
   compact = false,
@@ -364,7 +365,8 @@ export function DiscoveryCard({
   ring?: { hits: number; total: number } | null
   avgValue?: string | null
   otherLine?: string | null
-  evidenceLine: string
+  /** Dónde vas hoy frente al hallazgo (solo con dato de hoy). */
+  todayLine?: string | null
   ctaLabel: string
   onOpen: () => void
   /** Hoy: sin márgenes del feed de Descubre. */
@@ -376,7 +378,9 @@ export function DiscoveryCard({
       <Pressable
         onPress={onOpen}
         accessibilityRole="button"
-        accessibilityLabel={`${eyebrow}. ${title} ${evidenceLine}. ${ctaLabel}.`}
+        accessibilityLabel={[eyebrow, title, otherLine, todayLine, ctaLabel]
+          .filter(Boolean)
+          .join('. ')}
         style={({ pressed }) => [
           styles.card,
           { borderColor: `${look.accent}40` },
@@ -426,7 +430,7 @@ export function DiscoveryCard({
           <Text style={styles.cardTitle}>{title}</Text>
         </View>
         {otherLine ? <Text style={styles.cardOther}>{otherLine}</Text> : null}
-        <Text style={styles.cardEvidence}>{evidenceLine}</Text>
+        {todayLine ? <Text style={styles.cardToday}>{todayLine}</Text> : null}
         <View style={styles.cardCta}>
           <Text style={[styles.cardCtaText, { color: look.accent }]}>{ctaLabel}</Text>
           <Text style={[styles.cardCtaText, { color: look.accent }]}>→</Text>
@@ -449,14 +453,15 @@ export function evidenceLineOf(sample: PatternSample | undefined, source: string
 export function SurpriseCard({
   surprise,
   label,
-  source,
+  today,
   onOpen,
   ctaLabel = 'Ver el detalle',
   compact = false,
 }: {
   surprise: Surprise
   label: EvidenceLabel
-  source: string
+  /** Dónde va hoy frente al corte (surpriseToday); null sin dato de hoy. */
+  today?: SurpriseToday | null
   onOpen: () => void
   ctaLabel?: string
   compact?: boolean
@@ -478,7 +483,7 @@ export function SurpriseCard({
             ? `${otherRow.label}: ${otherRow.value}`
             : null
       }
-      evidenceLine={evidenceLineOf(surprise.sample, source)}
+      todayLine={today?.text ?? null}
       ctaLabel={ctaLabel}
       onOpen={onOpen}
       compact={compact}
@@ -625,7 +630,239 @@ export function SurpriseDetailModal({
   )
 }
 
+/* ── "Tu día fuerte" a pantalla completa ──────────────────────────────── */
+
+export type ComboDetailHero =
+  | {
+      kind: 'gap'
+      /** "350 kcal" */
+      value: string
+      /** "más abajo que tus otros días" */
+      caption: string
+      bars: { label: string; value: string; pct: number; strong: boolean }[]
+    }
+  | { kind: 'rate'; strong: SurpriseSide; other: SurpriseSide }
+
+/**
+ * El detalle de "Tu día fuerte" con la MISMA gramática que el de la sorpresa
+ * (dueña 14 oct 2026: "si nos inspiramos en Fitness y Salud, esta view también
+ * debe sentirse así"): etiqueta en el color del dato, íconos de lo que se
+ * cruza, UN héroe (la diferencia en kcal con sus dos barras, estilo Destacados
+ * de Salud; sin kcal, el anillo de días en déficit), la frase, HOY, la
+ * evidencia en una línea, tus días, los límites y "¿Coincide?". Presentacional:
+ * los números llegan calculados por el motor.
+ */
+export function ComboDetailModal({
+  visible,
+  eyebrow,
+  icons,
+  hero,
+  title,
+  today,
+  evidenceLine,
+  daysLine,
+  unknowns,
+  feedback,
+  onClose,
+}: {
+  visible: boolean
+  eyebrow: string
+  icons: EvidenceIcon[]
+  hero: ComboDetailHero
+  title: string
+  /** Los hábitos del combo hoy: "Sueño · 6 h", hecho o no. */
+  today: { label: string; value: string; on: boolean }[]
+  evidenceLine: string | null
+  daysLine: string | null
+  unknowns: string[]
+  feedback?: InsightFeedbackProps
+  onClose: () => void
+}) {
+  const insets = useSafeAreaInsets()
+  const accent = colors.oro
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+      statusBarTranslucent
+    >
+      <View style={styles.root}>
+        <ScrollView
+          contentContainerStyle={[
+            styles.scroll,
+            { paddingTop: insets.top + 64, paddingBottom: insets.bottom + 120 },
+          ]}
+          showsVerticalScrollIndicator={false}
+        >
+          <Text style={[styles.eyebrow, { color: accent }]}>{eyebrow}</Text>
+          <View style={styles.icons}>
+            {icons.map((icon, i) => (
+              <View
+                key={icon.name}
+                style={[
+                  styles.iconDisc,
+                  { backgroundColor: `${icon.color}33` },
+                  i > 0 && styles.iconOverlap,
+                ]}
+              >
+                <MaterialCommunityIcons name={icon.name} size={26} color={icon.color} />
+              </View>
+            ))}
+          </View>
+
+          {hero.kind === 'gap' ? (
+            <View
+              style={styles.heroCol}
+              accessible
+              accessibilityLabel={`${hero.value} ${hero.caption}. ${hero.bars
+                .map((b) => `${b.label}: ${b.value}`)
+                .join(', ')}.`}
+            >
+              <Text style={[styles.avgNum, { color: accent }]}>{hero.value}</Text>
+              <Text style={styles.heroLabel}>{hero.caption}</Text>
+              <View style={styles.comboBars}>
+                {hero.bars.map((b) => (
+                  <View key={b.label} style={styles.comboBarRow}>
+                    <View style={styles.comboBarHead}>
+                      <Text style={[styles.comboBarLabel, b.strong && styles.comboBarStrong]}>
+                        {b.label}
+                      </Text>
+                      <Text style={[styles.comboBarValue, b.strong && { color: accent }]}>
+                        {b.value}
+                      </Text>
+                    </View>
+                    <View style={styles.comboBarTrack}>
+                      <View
+                        style={[
+                          styles.comboBarFill,
+                          { width: `${Math.max(3, Math.round(b.pct * 100))}%` },
+                          { backgroundColor: b.strong ? accent : colors.niebla },
+                        ]}
+                      />
+                    </View>
+                  </View>
+                ))}
+                <Text style={styles.comboBarCaption}>Contra tu meta de calorías, en promedio</Text>
+              </View>
+            </View>
+          ) : (
+            <RateHero
+              strong={hero.strong}
+              other={hero.other}
+              accent={accent}
+              reveal={false}
+              onRevealed={() => {}}
+            />
+          )}
+
+          <Animated.View entering={FadeIn.duration(200)} style={styles.rest}>
+            <Text style={styles.title}>{title}</Text>
+            {today.length > 0 ? (
+              <View style={styles.today}>
+                <View style={styles.todayHead}>
+                  <MaterialCommunityIcons name="white-balance-sunny" size={16} color={accent} />
+                  <Text style={[styles.todayKicker, { color: accent }]}>Hoy</Text>
+                </View>
+                <View style={styles.comboChips}>
+                  {today.map((h) => (
+                    <View
+                      key={h.label}
+                      style={[styles.comboChip, h.on && styles.comboChipOn]}
+                      accessible
+                      accessibilityLabel={`${h.label}: ${h.on ? 'hecho, ' : ''}${h.value}`}
+                    >
+                      <Text style={styles.comboChipLabel}>{h.label}</Text>
+                      <Text style={[styles.comboChipValue, h.on && { color: colors.oroLeche }]}>
+                        {h.on ? `${h.value} ✓` : h.value}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            ) : null}
+            {evidenceLine ? <Text style={styles.evidence}>{evidenceLine}</Text> : null}
+            {daysLine ? <Text style={[styles.evidence, styles.comboDays]}>{daysLine}</Text> : null}
+            <EvidenceUnknowns lines={unknowns} footnote />
+            {feedback ? <InsightFeedback {...feedback} /> : null}
+          </Animated.View>
+        </ScrollView>
+
+        <Pressable
+          onPress={onClose}
+          hitSlop={14}
+          accessibilityRole="button"
+          accessibilityLabel="Cerrar"
+          style={[styles.close, { top: insets.top + 12 }]}
+        >
+          <Text style={styles.closeX}>✕</Text>
+        </Pressable>
+        <View style={[styles.ctaWrap, { paddingBottom: insets.bottom + 16 }]}>
+          <Pressable
+            onPress={onClose}
+            accessibilityRole="button"
+            style={({ pressed }) => [styles.cta, pressed && { opacity: 0.85 }]}
+          >
+            <Text style={styles.ctaText}>Listo</Text>
+          </Pressable>
+        </View>
+      </View>
+    </Modal>
+  )
+}
+
 const styles = StyleSheet.create({
+  comboBars: { alignSelf: 'stretch', marginTop: 24, gap: 14 },
+  comboBarRow: { gap: 6 },
+  comboBarHead: { flexDirection: 'row', justifyContent: 'space-between' },
+  comboBarLabel: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    color: colors.niebla,
+  },
+  comboBarStrong: { color: colors.leche },
+  comboBarValue: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.body,
+    color: colors.bone,
+    fontVariant: ['tabular-nums'],
+  },
+  comboBarTrack: {
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: colors.hairline,
+    overflow: 'hidden',
+  },
+  comboBarFill: { height: 12, borderRadius: 6 },
+  comboBarCaption: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    color: colors.niebla,
+  },
+  comboChips: { flexDirection: 'row', gap: 8, marginTop: 10 },
+  comboChip: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    backgroundColor: colors.bgCard2,
+    gap: 2,
+  },
+  comboChipOn: { backgroundColor: 'rgba(217, 174, 111, 0.16)' },
+  comboChipLabel: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.tinyLabel,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+    color: colors.niebla,
+  },
+  comboChipValue: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.ui,
+    color: colors.bone,
+  },
+  comboDays: { marginTop: 4 },
   cardWrap: { marginTop: 4, marginBottom: 36 },
   card: {
     padding: 20,
@@ -683,10 +920,10 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.body,
     color: colors.bone,
   },
-  cardEvidence: {
+  cardToday: {
     marginTop: -6,
     fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.label,
+    fontSize: typography.sizes.body,
     color: colors.niebla,
   },
   cardCta: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
