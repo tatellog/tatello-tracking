@@ -35,13 +35,9 @@ import { emitReplayReveal, useRevelationHistory } from '@/features/revelations'
 import { RevealedEmblem } from '@/features/tabs/components/constellation/RevealedEmblem'
 import { signName, zodiacFromDate } from '@/features/tabs/zodiac'
 import type { ZodiacSign } from '@/features/tabs/zodiac/types'
-import { useMacroTargets } from '@/features/macros/hooks'
-import { GLASS_ML, useWaterGoal } from '@/features/water/useWaterGoal'
-import { todayInTimezone, userTimezone } from '@/lib/time'
+import { todayInTimezone } from '@/lib/time'
 import { WatchMark } from '@/features/wearables/components/WatchMark'
 import { formatSleepShort } from '@/features/wearables/recovery'
-import { useWearableSleepNights } from '@/features/wearables/hooks'
-import { addDaysIso } from '@/features/wearables/sleep-detail'
 import { AiCta } from '@/components/AiCta'
 import { useSession } from '@/hooks/useSession'
 import { aiEnabledForEmail } from '@/lib/featureFlags'
@@ -55,14 +51,12 @@ import {
   correlationForKind,
   daysInDeficit,
   deficitTrajectoryRead,
-  detectMonthPatterns,
   monthCalendar,
   monthChange,
   monthReveals,
   presenceSummary,
   revealDayMap,
   weeklyComboLever,
-  winningCombo,
   type ComboReveal,
   type EvidenceBar,
   type MonthPattern,
@@ -73,6 +67,7 @@ import {
 import { isDeficitDay } from '../deficit'
 import {
   EVIDENCE_LABEL_TEXT,
+  comboEvidenceSample,
   evidenceUnknowns,
   monthPatternLabel,
   patternSampleLine,
@@ -106,15 +101,13 @@ import {
   type ComboWeekMeter,
 } from '../combo-facts'
 import { useComboTranscript } from '../combo-transcript'
-import { comboKey, combosBornRecently } from '../combo-memory'
-import { useSeenCombos } from '../combo-seen'
+import { comboKey } from '../combo-memory'
 import { useSurpriseRevealSeen } from '../surprise-seen'
-import { bedtimeOffsetMinutes } from '../bedtime'
-import { rankSurprises, surpriseToday } from '../surprise'
+import { useFeaturedDiscovery } from '../useFeaturedDiscovery'
+import { useHoyDiscoveryState } from '../hoy-discovery-store'
+import { surpriseToday } from '../surprise'
 import { NotifyOfferSheet } from '@/features/notifications/components/NotifyOfferSheet'
 import { useNotifyOffer } from '@/features/notifications/offer'
-import { earlyReading } from '../early-readings'
-import { dataMaturity } from '../maturity'
 import { useSaveReflection } from '../reflections'
 import { EvidenceChip, EvidenceComparison, EvidenceHeader } from './EvidenceHighlight'
 import { EmptySegmentCard } from './EmptySegmentCard'
@@ -329,8 +322,23 @@ export function MonthSegment({
   // Los PATRONES son acumulativos: se aprenden con el tiempo, no pertenecen a un
   // mes calendario (si no, se borrarían cada día 1). Leen una ventana larga (90d),
   // no monthSignals. El calendario y el KPI sí son del mes en curso.
-  const { data: longHistory } = useSignalsHistory(90)
-  const patternSignals = useMemo(() => longHistory ?? [], [longHistory])
+  // Lo que el motor encontró vive en UN hook compartido con Hoy (ST-007): el
+  // destacado de Hoy siempre es el mismo que encabeza este feed.
+  const discovery = useFeaturedDiscovery()
+  const {
+    patternSignals,
+    maturity,
+    calorieTarget,
+    proteinTarget,
+    waterGoalGlasses,
+    firstSignal,
+    seenUid,
+    seenCombos,
+    recentCombos,
+    combo,
+    allPatterns,
+    supportPatterns,
+  } = discovery
   // Días con señal en la ventana de patrones — decide el TONO del estado
   // vacío: pocos días = promesa con siluetas (anticipación honesta); muchos
   // días sin patrón = el "sin relleno" honesto de siempre.
@@ -339,9 +347,6 @@ export function MonthSegment({
     [patternSignals],
   )
 
-  // Madurez de datos (docs/orbita-maturity-spec.md): la sección promete solo
-  // lo que sus días sostienen. Etapa por días CON DATOS, por dimensión.
-  const maturity = useMemo(() => dataMaturity(patternSignals), [patternSignals])
   // El detalle de evidencia de un patrón: su etiqueta y lo que aún no prueba.
   const withEvidence = (p: MonthPattern): EvidenceItem => ({
     ...p,
@@ -349,43 +354,9 @@ export function MonthSegment({
     unknowns: evidenceUnknowns(p, maturity.stage),
     source: patternSourceLine(p.id, patternSignals),
   })
-  // "Lo que no sabías" (etapa 3+): el ranker de sorpresa elige UN protagonista;
-  // lo esperado (el combo sueño + entreno) baja a "Lo que te sostiene".
-  const surpriseTargets = useMacroTargets().data
-  // La hora de dormirse solo vive en la tabla del reloj (no en daily_signals):
-  // se lee la misma ventana de 90 días que los patrones.
-  const nightsTo = todayInTimezone()
-  const sleepNights = useWearableSleepNights(addDaysIso(nightsTo, -89), nightsTo).data
-  const surprises = useMemo(() => {
-    if (maturity.stage < 3) return { hero: null, others: [] }
-    const tz = userTimezone()
-    const bedtimes = new Map<string, number>()
-    for (const n of sleepNights ?? []) {
-      if (n.bedtime_at) bedtimes.set(n.sleep_date, bedtimeOffsetMinutes(n.bedtime_at, tz))
-    }
-    return rankSurprises(patternSignals, {
-      calorieTarget: surpriseTargets?.calories ?? null,
-      proteinTarget: surpriseTargets?.protein_g ?? null,
-      bedtimes,
-    })
-  }, [
-    maturity.stage,
-    patternSignals,
-    sleepNights,
-    surpriseTargets?.calories,
-    surpriseTargets?.protein_g,
-  ])
-  const surprise = view === 'patterns' ? surprises.hero : null
-  const firstSignal = useMemo(
-    () => (maturity.stage >= 1 ? earlyReading(patternSignals, todayInTimezone()) : null),
-    [maturity.stage, patternSignals],
-  )
-
-  const targets = useMacroTargets().data
-  const proteinTarget = targets?.protein_g ?? null
-  const calorieTarget = targets?.calories ?? null
-  const { goalMl } = useWaterGoal()
-  const waterGoalGlasses = Math.max(1, Math.round(goalMl / GLASS_ML))
+  // "Lo que no sabías" (etapa 3+): el protagonista del feed; lo esperado (el
+  // combo sueño + entreno) baja a "Lo que te sostiene".
+  const surprise = view === 'patterns' ? discovery.surprise : null
 
   // El KPI de déficit y el calendario "Tu mes de un vistazo" hablan del MES EN
   // CURSO (no de la ventana rodante de 31 días), así sus conteos coinciden
@@ -449,68 +420,12 @@ export function MonthSegment({
   // Histéresis (dueña 26 sep 2026): un patrón que ya se mostró sigue vivo con
   // la vara de permanencia. "Ya mostrado" = nació en las últimas 2 semanas o
   // quedó guardado en el teléfono cuando se vio.
-  const seenUid = useSession().session?.user?.id ?? null
-  const seenCombos = useSeenCombos(seenUid)
-  const recentCombos = useMemo(
-    () =>
-      combosBornRecently(
-        patternSignals,
-        { calorieTarget, proteinTarget, waterGoalGlasses },
-        todayInTimezone(),
-      ),
-    [patternSignals, calorieTarget, proteinTarget, waterGoalGlasses],
-  )
-  const seenKeys = seenCombos.keys
-  const keepCombos = useMemo(
-    () => [...new Set([...seenKeys, ...recentCombos])],
-    [seenKeys, recentCombos],
-  )
-  const combo = useMemo(
-    () =>
-      winningCombo(patternSignals, {
-        calorieTarget,
-        proteinTarget,
-        waterGoalGlasses,
-        keep: keepCombos,
-      }),
-    [patternSignals, calorieTarget, proteinTarget, waterGoalGlasses, keepCombos],
-  )
   // Lo que se muestra queda guardado: mañana sigue con la vara de permanencia.
   const shownKey = combo ? comboKey(combo.signals.map((x) => x.key)) : null
   useEffect(() => {
     if (shownKey) seenCombos.mark(shownKey)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shownKey, seenCombos.ready])
-  // Patrones de apoyo: correlaciones demostrables del motor (kind 'pattern'). Se
-  // excluye lo que ya dijo el combo (sin redundancia) y se ordena por relevancia
-  // (déficit es el norte). Tope: 2 con combo, 3 sin él (el astrónomo no abruma).
-  const allPatterns = useMemo(
-    () => detectMonthPatterns(patternSignals, { calorieTarget, proteinTarget }),
-    [patternSignals, calorieTarget, proteinTarget],
-  )
-  const supportPatterns = useMemo(() => {
-    const comboKeys = new Set(combo?.signals.map((s) => s.key) ?? [])
-    const coveredByCombo = (id: string): boolean => {
-      if (id === 'sleep-deficit') return comboKeys.has('sueno')
-      if (id === 'training-protein') return comboKeys.has('cuerpo') && comboKeys.has('proteina')
-      // El combo ya conecta movimiento con el déficit → no repetir.
-      if (id === 'movement-deficit') return comboKeys.has('cuerpo')
-      return false
-    }
-    const PRIORITY: Record<string, number> = {
-      // La FALLA primero (dónde se rompe tu déficit) — es la promesa.
-      'deficit-daytype': 0,
-      // El par que conecta esfuerzo (movimiento) ↔ norte (déficit): alto valor.
-      'movement-deficit': 1,
-      'surplus-concentration': 2,
-      'sleep-deficit': 3,
-      'training-protein': 4,
-    }
-    return allPatterns
-      .filter((p) => p.kind === 'pattern' && !coveredByCombo(p.id))
-      .sort((a, b) => (PRIORITY[a.id] ?? 9) - (PRIORITY[b.id] ?? 9))
-      .slice(0, combo ? 2 : 3)
-  }, [allPatterns, combo])
   // Puente con la ceremonia fechada: si una PIEZA del combo dominante ya se
   // reveló y guardó (tabla `revelations`), mostramos su procedencia factual
   // ("Entreno → déficit · 18/22 días · descubierto el 30 jun") que revive la
@@ -642,11 +557,20 @@ export function MonthSegment({
   // Primera apertura de ese hallazgo = la revelación (anillo, conteo, chispas).
   const surpriseSeen = useSurpriseRevealSeen(seenUid)
   const [surpriseFirst, setSurpriseFirst] = useState(false)
+  // Abrir un hallazgo aquí también lo "gasta" en Hoy (deja de asomar allá).
+  const hoyDiscovery = useHoyDiscoveryState(seenUid)
+  const openSurprise = (id: string) => {
+    hoyDiscovery.markOpened(id)
+    setSurpriseFirst(surpriseSeen.isNew(id))
+    surpriseSeen.markSeen(id)
+    setSurpriseOpen(true)
+  }
   // Abrir una evidencia cuenta como visto para el push N9: ese hallazgo no se
   // avisa en 14 días (no se manda lo que ya leíste).
   const qc = useQueryClient()
   const openEvidence = (p: EvidenceItem) => {
     setEvidence(p)
+    if (p.id) hoyDiscovery.markOpened(p.id)
     if (seenUid && p.id) {
       void writeFindingLedgerEntry(seenUid, p.id, new Date().toISOString()).then(() =>
         qc.invalidateQueries({ queryKey: queryKeys.notifications.findingLedger(seenUid) }),
@@ -657,13 +581,19 @@ export function MonthSegment({
   // cuando Mes está a la vista y ya tiene sus patrones (90 días cargados).
   const evidenceFocused = useIsFocused()
   useEffect(() => {
-    if (!evidenceFocused || longHistory === undefined) return
+    if (!evidenceFocused || !discovery.loaded) return
     const id = consumeOrbitEvidence()
     if (!id) return
+    // Desde Hoy (ST-007) o el push N9: se abre EXACTAMENTE ese hallazgo. Un
+    // combo no tiene modal propio: su tarjeta ya encabeza el feed.
+    if (surprise && id === surprise.id) {
+      openSurprise(id)
+      return
+    }
     const p = allPatterns.find((x) => x.id === id)
     if (p) openEvidence(withEvidence(p))
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [evidenceFocused, longHistory, allPatterns])
+  }, [evidenceFocused, discovery.loaded, allPatterns, surprise])
   // El patrón dominante abre el modal cinemático a pantalla completa (no el panel).
   const [reveal, setReveal] = useState<ComboReveal | null>(null)
   // "✦ Quiero entenderlo": la IA explica el patrón dominante que el motor ya
@@ -918,11 +848,7 @@ export function MonthSegment({
                       maturity.stage,
                     )}
                     source={patternSourceLine(surprise.id, patternSignals)}
-                    onOpen={() => {
-                      setSurpriseFirst(surpriseSeen.isNew(surprise.id))
-                      surpriseSeen.markSeen(surprise.id)
-                      setSurpriseOpen(true)
-                    }}
+                    onOpen={() => openSurprise(surprise.id)}
                   />
                 ) : null}
                 {surprise && combo ? (
@@ -1746,21 +1672,8 @@ function StrongDayCard({
   }, [done])
 
   const withLabel = total === 2 ? 'Con los dos' : 'Con el patrón'
-  // La muestra es la que la tarjeta ENSEÑA: los días completos de las barras
-  // si hay prueba en kcal; si no, los días del conteo de déficit.
-  const sample: PatternSample = gap
-    ? {
-        groups: [
-          { label: withLabel, days: gap.withDays },
-          { label: 'Otros días', days: gap.restDays },
-        ],
-      }
-    : {
-        groups: [
-          { label: withLabel, days: combo.occurrences },
-          { label: 'Otros días', days: combo.restDays },
-        ],
-      }
+  // La muestra es la que la tarjeta ENSEÑA (compartida con el destacado de Hoy).
+  const sample = comboEvidenceSample(combo, gap)
   const evidence =
     EVIDENCE_LABEL_TEXT[monthPatternLabel({ kind: 'pattern', sample }, maturityStage)]
   const sampleLine = patternSampleLine(sample)

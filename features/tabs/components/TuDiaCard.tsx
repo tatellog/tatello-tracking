@@ -83,10 +83,10 @@ export function TuDiaCard({
   const gold = model.kind === 'close' && model.verdict.kind === 'deficit'
   const a11y =
     model.kind === 'close'
-      ? `${model.eyebrow}. ${model.title} ${model.line}${model.reading ? ` ${model.reading}` : ''}. Abre Descubre.`
+      ? `${model.eyebrow}. ${model.title} ${model.line}${model.reading ? ` ${model.reading}` : ''}. Abre tu día.`
       : model.kind === 'weekly'
         ? 'Tu lectura semanal está lista. Ábrela.'
-        : `${model.eyebrow}. ${model.title}${model.line ? ` ${model.line}` : ''} Abre Descubre.`
+        : `${model.eyebrow}. ${model.title}${model.line ? ` ${model.line}` : ''} Abre tu día.`
 
   return (
     <Animated.View entering={FadeIn.duration(420)} style={styles.card}>
@@ -112,7 +112,7 @@ export function TuDiaCard({
             </EyebrowLabel>
           </View>
           {/* Dice a dónde lleva (antes un "›" suelto). */}
-          <Text style={styles.chevron}>{model.kind === 'weekly' ? 'Leer ›' : 'Descubre ›'}</Text>
+          <Text style={styles.chevron}>{model.kind === 'weekly' ? 'Leer ›' : 'Ver tu día ›'}</Text>
         </View>
 
         {model.kind === 'weekly' ? (

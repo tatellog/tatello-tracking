@@ -38,7 +38,7 @@ import Svg, { Circle, Defs, RadialGradient, Stop } from 'react-native-svg'
 
 import { colors, typography } from '@/theme'
 
-import { EVIDENCE_LABEL_TEXT, type EvidenceLabel } from '../evidence-label'
+import { EVIDENCE_LABEL_TEXT, type EvidenceLabel, type PatternSample } from '../evidence-label'
 import { evidenceLook, type EvidenceLook } from '../evidence-highlight'
 import type { Surprise, SurpriseSide, SurpriseToday } from '../surprise'
 
@@ -341,41 +341,40 @@ function TodayBlock({ today, look }: { today: SurpriseToday; look: EvidenceLook 
 const CARD_RING = 84
 const CARD_STROKE = 9
 
-/** "Lo que no sabías" en el feed: la misma gramática que su detalle (íconos,
- *  color del dato, anillo) en chico, para que tocarla abra lo que promete. */
-export function SurpriseCard({
-  surprise,
-  label,
-  source,
+/** La tarjeta de un hallazgo: íconos + eyebrow en el color del dato, anillo
+ *  chico (o valor de promedio) junto a la frase, el otro lado, la evidencia en
+ *  una línea y el CTA. Base común de "Lo que no sabías" y del destacado de Hoy. */
+export function DiscoveryCard({
+  look,
+  eyebrow,
+  title,
+  ring,
+  avgValue,
+  otherLine,
+  evidenceLine,
+  ctaLabel,
   onOpen,
+  compact = false,
 }: {
-  surprise: Surprise
-  label: EvidenceLabel
-  source: string
+  look: EvidenceLook
+  eyebrow: string
+  title: string
+  ring?: { hits: number; total: number } | null
+  avgValue?: string | null
+  otherLine?: string | null
+  evidenceLine: string
+  ctaLabel: string
   onOpen: () => void
+  /** Hoy: sin márgenes del feed de Descubre. */
+  compact?: boolean
 }) {
-  const look = evidenceLook(surprise.id, colors.oro)
-  const compare = surprise.compare
   const full = useSharedValue(1)
-  const strongRow = surprise.rows.find((r) => r.strong) ?? surprise.rows[0]
-  const otherLine = compare
-    ? `${compare.other.label}: ${compare.other.hits}\u00a0de\u00a0${compare.other.total}`
-    : (() => {
-        const o = surprise.rows.find((r) => r !== strongRow)
-        return o ? `${o.label}: ${o.value}` : null
-      })()
-  const total = surprise.sample
-    ? (surprise.sample.total ?? surprise.sample.groups.reduce((a, g) => a + g.days, 0))
-    : null
-  const evidenceLine = [total ? `${total} días comparados` : null, source.toLowerCase()]
-    .filter(Boolean)
-    .join(' · ')
   return (
-    <Animated.View entering={FadeIn.duration(420)} style={styles.cardWrap}>
+    <Animated.View entering={FadeIn.duration(420)} style={!compact && styles.cardWrap}>
       <Pressable
         onPress={onOpen}
         accessibilityRole="button"
-        accessibilityLabel={`Lo que no sabías. ${EVIDENCE_LABEL_TEXT[label]}. ${surprise.headline} ${evidenceLine}. Ver el detalle.`}
+        accessibilityLabel={`${eyebrow}. ${title} ${evidenceLine}. ${ctaLabel}.`}
         style={({ pressed }) => [
           styles.card,
           { borderColor: `${look.accent}40` },
@@ -398,11 +397,11 @@ export function SurpriseCard({
             ))}
           </View>
           <Text style={[styles.cardEyebrow, { color: look.accent }]} numberOfLines={2}>
-            {`Lo que no sabías · ${EVIDENCE_LABEL_TEXT[label]}`}
+            {eyebrow}
           </Text>
         </View>
         <View style={styles.cardBody}>
-          {compare ? (
+          {ring ? (
             <View style={{ width: CARD_RING, height: CARD_RING }}>
               <Ring
                 size={CARD_RING}
@@ -410,28 +409,78 @@ export function SurpriseCard({
                 color={look.accent}
                 track={`${look.accent}26`}
                 progress={full}
-                pct={compare.strong.total > 0 ? compare.strong.hits / compare.strong.total : 0}
+                pct={ring.total > 0 ? ring.hits / ring.total : 0}
               />
               <View style={styles.heroCenter} pointerEvents="none">
                 <Text style={styles.cardRingNum}>
-                  {compare.strong.hits}
-                  <Text style={styles.cardRingOf}>{`/${compare.strong.total}`}</Text>
+                  {ring.hits}
+                  <Text style={styles.cardRingOf}>{`/${ring.total}`}</Text>
                 </Text>
               </View>
             </View>
-          ) : strongRow ? (
-            <Text style={[styles.cardAvg, { color: look.accent }]}>{strongRow.value}</Text>
+          ) : avgValue ? (
+            <Text style={[styles.cardAvg, { color: look.accent }]}>{avgValue}</Text>
           ) : null}
-          <Text style={styles.cardTitle}>{surprise.headline}</Text>
+          <Text style={styles.cardTitle}>{title}</Text>
         </View>
         {otherLine ? <Text style={styles.cardOther}>{otherLine}</Text> : null}
         <Text style={styles.cardEvidence}>{evidenceLine}</Text>
         <View style={styles.cardCta}>
-          <Text style={[styles.cardCtaText, { color: look.accent }]}>Ver el detalle</Text>
+          <Text style={[styles.cardCtaText, { color: look.accent }]}>{ctaLabel}</Text>
           <Text style={[styles.cardCtaText, { color: look.accent }]}>→</Text>
         </View>
       </Pressable>
     </Animated.View>
+  )
+}
+
+/** "N días comparados · con tus registros…": la evidencia en una línea. */
+export function evidenceLineOf(sample: PatternSample | undefined, source: string): string {
+  const total = sample ? (sample.total ?? sample.groups.reduce((a, g) => a + g.days, 0)) : null
+  return [total ? `${total} días comparados` : null, source.toLowerCase()]
+    .filter(Boolean)
+    .join(' · ')
+}
+
+/** "Lo que no sabías" en el feed: la misma gramática que su detalle (íconos,
+ *  color del dato, anillo) en chico, para que tocarla abra lo que promete. */
+export function SurpriseCard({
+  surprise,
+  label,
+  source,
+  onOpen,
+  ctaLabel = 'Ver el detalle',
+  compact = false,
+}: {
+  surprise: Surprise
+  label: EvidenceLabel
+  source: string
+  onOpen: () => void
+  ctaLabel?: string
+  compact?: boolean
+}) {
+  const compare = surprise.compare
+  const strongRow = surprise.rows.find((r) => r.strong) ?? surprise.rows[0]
+  const otherRow = surprise.rows.find((r) => r !== strongRow)
+  return (
+    <DiscoveryCard
+      look={evidenceLook(surprise.id, colors.oro)}
+      eyebrow={`Lo que no sabías · ${EVIDENCE_LABEL_TEXT[label]}`}
+      title={surprise.headline}
+      ring={compare ? { hits: compare.strong.hits, total: compare.strong.total } : null}
+      avgValue={compare ? null : (strongRow?.value ?? null)}
+      otherLine={
+        compare
+          ? `${compare.other.label}: ${compare.other.hits}\u00a0de\u00a0${compare.other.total}`
+          : otherRow
+            ? `${otherRow.label}: ${otherRow.value}`
+            : null
+      }
+      evidenceLine={evidenceLineOf(surprise.sample, source)}
+      ctaLabel={ctaLabel}
+      onOpen={onOpen}
+      compact={compact}
+    />
   )
 }
 
@@ -479,12 +528,7 @@ export function SurpriseDetailModal({
       ? 'Nuevo patrón encontrado'
       : 'Nueva observación'
     : EVIDENCE_LABEL_TEXT[label]
-  const total = surprise.sample
-    ? (surprise.sample.total ?? surprise.sample.groups.reduce((a, g) => a + g.days, 0))
-    : null
-  const evidenceLine = [total ? `${total} días comparados` : null, source.toLowerCase()]
-    .filter(Boolean)
-    .join(' · ')
+  const evidenceLine = evidenceLineOf(surprise.sample, source)
 
   return (
     <Modal

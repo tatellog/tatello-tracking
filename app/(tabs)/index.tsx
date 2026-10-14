@@ -69,6 +69,11 @@ import { workoutOfDay } from '@/features/wearables/workout-insights'
 import { earlyReading } from '@/features/orbit/early-readings'
 import { useSignalsHistory, useTodaySignals, useTotalSignalDays } from '@/features/orbit/hooks'
 import { useFirstStarCeremony } from '@/features/tabs/first-star'
+import { HoyDiscoveryStrip } from '@/features/orbit/components/HoyDiscoveryStrip'
+import { hoyDiscoveryModel, hoyDiscoveryVisible } from '@/features/orbit/hoy-discovery'
+import { useHoyDiscoveryState } from '@/features/orbit/hoy-discovery-store'
+import { requestOrbitEvidence, requestOrbitSegment } from '@/features/orbit/pending-segment'
+import { useFeaturedDiscovery } from '@/features/orbit/useFeaturedDiscovery'
 import { useWaterToday } from '@/features/water/hooks'
 import { ScrollPauseContext } from '@/features/orbit/useScreenActive'
 import { useBriefContext } from '@/features/brief/hooks'
@@ -748,6 +753,22 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
   // el centro se las chupa. El emblema guarda un brillo interno rumbo al
   // siguiente hallazgo de Descubre (etapas por días con datos, sin números).
   const discoverySignals = useSignalsHistory(90)
+  // ST-007 · el hallazgo destacado: el MISMO que encabeza Descubre (hook
+  // compartido; su ventana de 90 días ya está en caché, no hay fetch extra).
+  const featuredDiscovery = useFeaturedDiscovery()
+  // Solo mientras es NUEVO (dueña 13 oct 2026): se va al abrirlo o tras 3 días
+  // distintos en Hoy; después vive en Descubre.
+  const hoyDiscovery = useHoyDiscoveryState(featuredDiscovery.seenUid)
+  const featuredNow = featuredDiscovery.featured
+  const showFeatured =
+    featuredNow != null &&
+    hoyDiscovery.state != null &&
+    hoyDiscoveryVisible(hoyDiscovery.state, featuredNow.id, ctx.date)
+  const featuredId = showFeatured ? featuredNow!.id : null
+  useEffect(() => {
+    if (featuredId) hoyDiscovery.markShown(featuredId, ctx.date)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [featuredId, ctx.date])
   const discovery = discoverySignals.data ? discoveryProgress(discoverySignals.data) : null
   const stardustUid = useSession().session?.user?.id ?? 'anon'
   // Plan de un día (dueña 6 oct 2026): solo en las cuentas del flag por ahora.
@@ -1102,6 +1123,31 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
               <CoachLine align="center" {...coachCopy} />
             </Animated.View>
 
+            {/* El hallazgo NUEVO (ST-007): el mismo que encabeza Descubre, como
+                franja, solo mientras es nuevo. Tocarlo abre ESE hallazgo allá. */}
+            {!viewingPast && showFeatured ? (
+              <View style={styles.featuredWrap}>
+                <HoyDiscoveryStrip
+                  model={hoyDiscoveryModel(
+                    featuredNow!,
+                    featuredDiscovery.maturity.stage,
+                    featuredDiscovery.patternSignals,
+                    {
+                      calorieTarget: featuredDiscovery.calorieTarget,
+                      proteinTarget: featuredDiscovery.proteinTarget,
+                      waterGoalGlasses: featuredDiscovery.waterGoalGlasses,
+                    },
+                  )}
+                  onOpen={() => {
+                    hoyDiscovery.markOpened(featuredNow!.id)
+                    requestOrbitEvidence(featuredNow!.id)
+                    requestOrbitSegment('mes')
+                    router.navigate('/(tabs)/orbit')
+                  }}
+                />
+              </View>
+            ) : null}
+
             {/* "Tu día" — la ÚNICA tarjeta de lectura: de día la lectura sin
                 número (V-02), desde las 20:00 el cierre con la cifra, y la
                 Lectura Semanal (V-06) cuando hay una sin abrir. Solo para HOY
@@ -1379,6 +1425,12 @@ const styles = StyleSheet.create({
   coachLineWrap: {
     marginTop: 12,
     marginBottom: 32,
+  },
+  // La franja del hallazgo nuevo: coach → 24 (el margen de la CoachLine se
+  // compensa) → franja → 28 → "Tu día".
+  featuredWrap: {
+    marginTop: -8,
+    marginBottom: 28,
   },
 })
 

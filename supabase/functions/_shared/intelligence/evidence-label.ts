@@ -16,6 +16,7 @@
  * días en CADA grupo comparado. Cambiar cualquiera de los dos cortes es
  * decisión de producto (plan maestro, regla 10).
  */
+import type { ComboKcalGap, ComboShape } from './combo-facts.ts'
 import type { EvidenceBar, MonthPattern } from './month-built.ts'
 import type { DailySignals } from './types.ts'
 
@@ -144,4 +145,26 @@ export function patternSourceLine(patternId: string, signals: readonly DailySign
         ? signals.some((s) => s.trained === true && s.workout_source === 'wearable')
         : false
   return fromWatch ? 'Con tus registros y tu smartwatch' : 'Con tus registros'
+}
+
+/**
+ * La muestra de "Tu día fuerte" (combo), la MISMA que enseña su tarjeta: los
+ * días completos de las barras en kcal si hay prueba; si no, los días del
+ * conteo de déficit. Compartida por Descubre y por el destacado de Hoy.
+ */
+export function comboEvidenceSample(combo: ComboShape, gap: ComboKcalGap | null): PatternSample {
+  const withLabel = combo.signals.length === 2 ? 'Con los dos' : 'Con el patrón'
+  return gap
+    ? {
+        groups: [
+          { label: withLabel, days: gap.withDays },
+          { label: 'Otros días', days: gap.restDays },
+        ],
+      }
+    : {
+        groups: [
+          { label: withLabel, days: combo.occurrences },
+          { label: 'Otros días', days: combo.restDays },
+        ],
+      }
 }
