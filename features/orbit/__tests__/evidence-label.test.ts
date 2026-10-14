@@ -6,6 +6,7 @@ import {
   patternSampleLine,
 } from '../evidence-label'
 import { detectMonthPatterns } from '../month-built'
+import { rankSurprises, rescueAfterOver, shortNightEffect } from '../surprise'
 import { addDays, mkSig, monIdxUTC } from './signals.fixture'
 
 /*
@@ -141,5 +142,70 @@ describe('cada patrón accionable declara su muestra (mismos conteos que sus bar
     for (const p of patterns) {
       expect(patternSampleLine(p.sample)).not.toBeNull()
     }
+  })
+})
+
+describe('total declarado: grupos que se traslapan no se suman', () => {
+  it('"el día después" contra tus días en general cuenta los días una vez', () => {
+    expect(
+      patternSampleLine({
+        groups: [
+          { label: 'El día después', days: 6 },
+          { label: 'Tus días en general', days: 20 },
+        ],
+        total: 20,
+      }),
+    ).toBe('20 días comparados · El día después 6 · Tus días en general 20')
+  })
+})
+
+describe('cada sorpresa declara su muestra (mismos conteos con los que decide)', () => {
+  it('noche corta: grupos = noches cortas y noches de 7 h o más (días completos)', () => {
+    const signals = month(14, (i) => ({
+      meal_count: 3,
+      sleep_minutes: i % 2 === 0 ? 300 : 450,
+      calories: i % 2 === 0 ? 2100 : 1500,
+    }))
+    const s = shortNightEffect(signals)!
+    expect(s.sample?.groups).toEqual([
+      { label: 'Noches de menos de 6 h', days: 7 },
+      { label: 'Noches de 7 h o más', days: 7 },
+    ])
+    expect(s.minSide).toBe(Math.min(...s.sample!.groups.map((g) => g.days)))
+  })
+
+  it('el rescate declara el total sin contar dos veces', () => {
+    // Cada 4 días uno sobre la meta; el siguiente cierra en déficit.
+    const signals = month(20, (i) => ({
+      meal_count: 2,
+      calories: i % 4 === 0 ? 2400 : i % 4 === 1 ? 1500 : 900,
+    }))
+    const s = rescueAfterOver(signals, { calorieTarget: TARGET })
+    expect(s).not.toBeNull()
+    expect(s!.sample).toEqual({
+      groups: [
+        { label: 'El día después', days: 5 },
+        { label: 'Tus días en general', days: 20 },
+      ],
+      total: 20,
+    })
+    expect(patternSampleLine(s!.sample)).toBe(
+      '20 días comparados · El día después 5 · Tus días en general 20',
+    )
+  })
+
+  it('toda sorpresa del ranker trae muestra', () => {
+    const signals = month(28, (i) => ({
+      meal_count: 3,
+      trained: i % 2 === 0,
+      sleep_minutes: i % 3 === 0 ? 300 : 450,
+      protein_g: i % 2 === 0 ? 90 : 140,
+      steps: i % 2 === 0 ? 12000 : 3000,
+      calories: i % 3 === 0 ? 2300 : 1500,
+    }))
+    const { hero, others } = rankSurprises(signals, { calorieTarget: TARGET })
+    const all = [hero, ...others].filter((x): x is NonNullable<typeof x> => x != null)
+    expect(all.length).toBeGreaterThan(0)
+    for (const s of all) expect(patternSampleLine(s.sample)).not.toBeNull()
   })
 })

@@ -51,8 +51,10 @@ export function monthPatternLabel(
   return enoughSample ? 'patron' : 'observacion'
 }
 
-/** Los grupos que un patrón comparó y cuántos días tiene cada uno. */
-export type PatternSample = { groups: { label: string; days: number }[] }
+/** Los grupos que un patrón comparó y cuántos días tiene cada uno. `total`
+ *  solo cuando los grupos se traslapan (un grupo contra TODOS tus días): ahí
+ *  sumar contaría días dos veces. */
+export type PatternSample = { groups: { label: string; days: number }[]; total?: number }
 
 /**
  * La línea de muestra, en plano: "27 días comparados · Con entreno 15 · Sin
@@ -60,7 +62,7 @@ export type PatternSample = { groups: { label: string; days: number }[] }
  */
 export function patternSampleLine(sample: PatternSample | null | undefined): string | null {
   if (!sample || sample.groups.length === 0) return null
-  const total = sample.groups.reduce((a, g) => a + g.days, 0)
+  const total = sample.total ?? sample.groups.reduce((a, g) => a + g.days, 0)
   if (total <= 0) return null
   const parts = sample.groups.map((g) => `${g.label} ${g.days}`)
   return [`${total} ${total === 1 ? 'día comparado' : 'días comparados'}`, ...parts].join(' · ')

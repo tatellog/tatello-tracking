@@ -19,6 +19,7 @@
 import { isDeficitDay } from './deficit.ts'
 import { dayQuality } from './day-quality.ts'
 import { lateBedtimeEffect } from './bedtime.ts'
+import type { PatternSample } from './evidence-label.ts'
 import type { DailySignals } from './types.ts'
 
 export type SurpriseId =
@@ -52,6 +53,9 @@ export type Surprise = {
   /** La evidencia sale del smartwatch (hora de dormirse, pasos): la tarjeta
    *  lo dice, para que nunca parezca que Stelar lo adivinó. */
   fromWatch?: boolean
+  /** Los grupos comparados con sus días (ST-005): los mismos conteos con los
+   *  que el detector decidió. Gobierna la etiqueta de evidencia. */
+  sample?: PatternSample
 }
 
 export type SurpriseOpts = {
@@ -117,6 +121,12 @@ export function shortNightEffect(signals: readonly DailySignals[]): Surprise | n
   if (diff < 150) return null // solo cuando la noche corta PIDE más; lo contrario no es hallazgo
   return {
     id: 'short-night',
+    sample: {
+      groups: [
+        { label: 'Noches de menos de 6 h', days: short.length },
+        { label: 'Noches de 7 h o más', days: good.length },
+      ],
+    },
     headline: `Después de dormir menos de 6 horas, tu cuerpo pide unas ${fmt(diff)} kcal más ese día.`,
     rows: [
       { label: 'Tras dormir menos de 6 h', value: `${fmt(a)} kcal`, strong: true },
@@ -147,6 +157,12 @@ export function proteinTrainingGap(signals: readonly DailySignals[]): Surprise |
   const less = diff < 0
   return {
     id: 'protein-training',
+    sample: {
+      groups: [
+        { label: 'Con entreno', days: train.length },
+        { label: 'Sin entreno', days: rest.length },
+      ],
+    },
     headline: less
       ? `Los días que entrenas comes unos ${fmt(-diff)} g menos de proteína que cuando descansas.`
       : `Los días que entrenas comes unos ${fmt(diff)} g más de proteína que cuando descansas.`,
@@ -186,6 +202,12 @@ export function stepsDeficit(
   const steps = (Math.floor(cut / 500) * 500).toLocaleString('es-MX')
   return {
     id: 'steps-deficit',
+    sample: {
+      groups: [
+        { label: 'Más pasos', days: high.length },
+        { label: 'Menos pasos', days: low.length },
+      ],
+    },
     headline: `Tus días de ${steps} pasos o más cierran en déficit más seguido.`,
     rows: [
       { label: `${steps} pasos o más`, value: `${hd} de ${high.length}`, strong: true },
@@ -228,6 +250,15 @@ export function weekdayBreak(
   const name = WEEKDAYS[worst.wd]!
   return {
     id: 'weekday-break',
+    sample: {
+      groups: [
+        {
+          label: `${WEEKDAYS_PLURAL[worst.wd]!.charAt(0).toUpperCase()}${WEEKDAYS_PLURAL[worst.wd]!.slice(1)}`,
+          days: worst.n,
+        },
+        { label: 'Resto de la semana', days: rest.length },
+      ],
+    },
     headline: weekend
       ? `El día que más se te complica es el ${name}.`
       : `No es el fin de semana: el día que más se te complica es el ${name}.`,
@@ -271,6 +302,14 @@ export function rescueAfterOver(
   if (diff < 0.15) return null
   return {
     id: 'rescue',
+    // "El día después" está DENTRO de tus días en general: el total no suma.
+    sample: {
+      groups: [
+        { label: 'El día después', days: after.length },
+        { label: 'Tus días en general', days: days.length },
+      ],
+      total: days.length,
+    },
     headline: 'Después de un día sobre tu meta, al día siguiente vuelves más seguido al déficit.',
     rows: [
       { label: 'El día después', value: `${ad} de ${after.length}`, strong: true },

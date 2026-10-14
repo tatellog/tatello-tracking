@@ -89,6 +89,12 @@ export function lateBedtimeEffect(
       : `Tras dormirte ${when} o más tarde`
   return {
     id: 'late-bedtime',
+    sample: {
+      groups: [
+        { label: 'Te dormiste antes', days: early.length },
+        { label: 'Te dormiste más tarde', days: late.length },
+      ],
+    },
     headline:
       when === 'después de medianoche'
         ? 'Cuando te duermes después de medianoche, al día siguiente cierras en déficit menos seguido.'

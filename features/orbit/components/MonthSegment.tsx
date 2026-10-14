@@ -889,7 +889,15 @@ export function MonthSegment({
             )}
             {combo || supportPatterns.length > 0 || surprise ? (
               <>
-                {surprise ? <SurpriseHero surprise={surprise} /> : null}
+                {surprise ? (
+                  <SurpriseHero
+                    surprise={surprise}
+                    label={monthPatternLabel(
+                      { kind: 'pattern', sample: surprise.sample },
+                      maturity.stage,
+                    )}
+                  />
+                ) : null}
                 {surprise && combo ? (
                   <Text style={[styles.eyebrow, styles.sustainEyebrow]}>Lo que te sostiene</Text>
                 ) : null}
@@ -903,7 +911,7 @@ export function MonthSegment({
                 {combo && view === 'patterns' ? (
                   <StrongDayCard
                     combo={combo}
-                    early={maturity.stage <= 2}
+                    maturityStage={maturity.stage}
                     discovered={shownKey != null && recentCombos.includes(shownKey)}
                     meter={comboWeekMeter(week)}
                     todayHabits={comboToday(
@@ -1629,10 +1637,13 @@ function comboSentence(combo: WinningComboData): string {
  * ranker de sorpresa: lo que ella NO sabía, no lo que más se repite. La frase
  * es el hallazgo; debajo, la comparación que lo prueba (dos filas, la fuerte
  * primero). Sin ✦: el motor lo encontró, no hay chat detrás (regla IA visible). */
-function SurpriseHero({ surprise }: { surprise: Surprise }) {
+function SurpriseHero({ surprise, label }: { surprise: Surprise; label: EvidenceLabel }) {
+  const sampleLine = patternSampleLine(surprise.sample)
   return (
     <Animated.View entering={FadeIn.duration(420)} style={styles.surprise}>
-      <Text style={styles.surpriseKicker}>Lo que no sabías</Text>
+      <Text
+        style={styles.surpriseKicker}
+      >{`Lo que no sabías · ${EVIDENCE_LABEL_TEXT[label]}`}</Text>
       {/* Procedencia a la vista: lo que sale del smartwatch lo dice ANTES de
           la frase, para que nunca parezca que Stelar lo adivinó. */}
       {surprise.fromWatch ? (
@@ -1652,6 +1663,7 @@ function SurpriseHero({ surprise }: { surprise: Surprise }) {
           </View>
         ))}
       </View>
+      {sampleLine ? <Text style={styles.findingSample}>{sampleLine}</Text> : null}
     </Animated.View>
   )
 }
@@ -1684,7 +1696,7 @@ const NUM_WORD = ['cero', 'una', 'dos', 'tres', 'cuatro']
 
 function StrongDayCard({
   combo,
-  early,
+  maturityStage,
   discovered,
   meter,
   todayHabits,
@@ -1696,8 +1708,8 @@ function StrongDayCard({
   onLog,
 }: {
   combo: WinningComboData
-  /** Muestra chica: el kicker lo dice. */
-  early: boolean
+  /** Madurez de los datos: junto con la muestra decide la etiqueta (ST-005). */
+  maturityStage: number
   /** Recién encontrado: tus días reales abren desplegados (la prueba manda). */
   discovered: boolean
   meter: ComboWeekMeter | null
@@ -1733,7 +1745,26 @@ function StrongDayCard({
     wasDone.current = done
   }, [done])
 
-  const kicker = done ? '★ Día fuerte armado' : early ? 'Tu día fuerte · temprano' : 'Tu día fuerte'
+  const withLabel = total === 2 ? 'Con los dos' : 'Con el patrón'
+  // La muestra es la que la tarjeta ENSEÑA: los días completos de las barras
+  // si hay prueba en kcal; si no, los días del conteo de déficit.
+  const sample: PatternSample = gap
+    ? {
+        groups: [
+          { label: withLabel, days: gap.withDays },
+          { label: 'Otros días', days: gap.restDays },
+        ],
+      }
+    : {
+        groups: [
+          { label: withLabel, days: combo.occurrences },
+          { label: 'Otros días', days: combo.restDays },
+        ],
+      }
+  const evidence =
+    EVIDENCE_LABEL_TEXT[monthPatternLabel({ kind: 'pattern', sample }, maturityStage)]
+  const sampleLine = patternSampleLine(sample)
+  const kicker = done ? '★ Día fuerte armado' : `Tu día fuerte · ${evidence}`
   const headline = done
     ? 'Hoy lo juntaste.'
     : rested
@@ -1745,7 +1776,6 @@ function StrongDayCard({
           : total === 2
             ? 'Vas a la mitad.'
             : `Llevas ${onCount} de ${total}.`
-  const withLabel = total === 2 ? 'Con los dos' : 'Con el patrón'
   // Barras de la prueba: cuánto quedas ABAJO de tu meta (arriba = barra mínima).
   const below = (d: number) => Math.max(0, -d)
   const barMax = gap ? Math.max(1, below(gap.withAvg), below(gap.restAvg)) : 1
@@ -1904,6 +1934,8 @@ function StrongDayCard({
           {`${combo.deficits} de ${combo.occurrences} días así cerraron en déficit.`}
         </Text>
       )}
+
+      {sampleLine ? <Text style={styles.findingSample}>{sampleLine}</Text> : null}
 
       {/* Tus días reales: sección con su "Ver todos", como en Salud. */}
       {dayCards.length > 0 ? (
