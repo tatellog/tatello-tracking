@@ -68,6 +68,12 @@ import {
   type ScanConfidence,
   type ScannedIngredient,
 } from '@/features/meal-scan/scan'
+import {
+  canConfirmIngredients,
+  mergeRescan,
+  parseDecimalInput,
+  withTypedMacro,
+} from '@/features/meal-scan/review-logic'
 import { SkyBackground } from '@/features/tabs/components'
 import { useProfile } from '@/features/profile/hooks'
 import { getWaterBreakdown, toStoredLiquids } from '@/features/water/api'
@@ -707,10 +713,21 @@ export default function ScanMealScreen() {
       .then((meal) => {
         if (!alive) return
         setName(meal.name)
-        setIngredients(meal.ingredients)
+        // Reescanear no borra lo que ella agregó a mano (ST-004 · H9).
+        const scannedIds = new Set(baseGramsRef.current.keys())
+        setIngredients((prev) => mergeRescan(meal.ingredients, prev, scannedIds))
         setConfidence(meal.confidence)
         baseGramsRef.current = new Map(meal.ingredients.map((i) => [i.id, i.grams]))
         setPortionScale(1)
+        // Nada que leer (no era una etiqueta, o no se vio comida): se dice,
+        // en vez de dejar el formulario vacío en silencio (H8).
+        if (meal.ingredients.length === 0) {
+          setScanError(
+            isLabel
+              ? 'No vimos una etiqueta nutrimental en esta foto. Toma otra o agrega el producto a mano.'
+              : 'No vimos comida en esta foto. Agrega lo que hay en tu plato y lo anotamos juntas.',
+          )
+        }
         setPhase('confirm')
       })
       .catch(() => {
@@ -869,7 +886,7 @@ export default function ScanMealScreen() {
   }
 
   const setGrams = (id: string, raw: string) => {
-    const grams = Number(raw.replace(/[^0-9]/g, '')) || 0
+    const grams = parseDecimalInput(raw)
     setIngredients((prev) => prev.map((i) => (i.id === id ? { ...i, grams } : i)))
   }
   const setIngredientName = (id: string, text: string) => {
@@ -902,23 +919,13 @@ export default function ScanMealScreen() {
   // Los 2 números del ingrediente manual, tecleados como los de SU porción
   // (los gramos actuales). Se guardan normalizados a per-100 para que la
   // fila escale igual que las del scan si luego ajusta los gramos.
+  // Una fila de etiqueta editada pasa a "ajustada por ti" y el dato que
+  // faltaba deja de faltar (review-logic.ts).
   const setIngredientKcal = (id: string, raw: string) => {
-    const kcal = Number(raw.replace(/[^0-9]/g, '')) || 0
-    setIngredients((prev) =>
-      prev.map((i) =>
-        i.id === id ? { ...i, kcalPer100: i.grams > 0 ? (kcal * 100) / i.grams : kcal } : i,
-      ),
-    )
+    setIngredients((prev) => prev.map((i) => (i.id === id ? withTypedMacro(i, 'kcal', raw) : i)))
   }
   const setIngredientProtein = (id: string, raw: string) => {
-    const protein = Number(raw.replace(/[^0-9]/g, '')) || 0
-    setIngredients((prev) =>
-      prev.map((i) =>
-        i.id === id
-          ? { ...i, proteinPer100: i.grams > 0 ? (protein * 100) / i.grams : protein }
-          : i,
-      ),
-    )
+    setIngredients((prev) => prev.map((i) => (i.id === id ? withTypedMacro(i, 'protein', raw) : i)))
   }
 
   // Pick a photo. On a fresh scan it re-runs the scan; in edit mode it
@@ -953,7 +960,11 @@ export default function ScanMealScreen() {
       ? ['Tomar foto', 'Elegir de galería', 'Cancelar']
       : ['Reescanear esta foto', 'Tomar otra foto', 'Elegir de galería', 'Cancelar']
     showActionSheet(
-      { title: 'Foto del platillo', options, cancelButtonIndex: options.length - 1 },
+      {
+        title: isLabel ? 'Foto de la etiqueta' : 'Foto del platillo',
+        options,
+        cancelButtonIndex: options.length - 1,
+      },
       (i) => {
         if (attachOnly) {
           if (i === 0) void pickPhoto('camera')
@@ -1201,8 +1212,8 @@ export default function ScanMealScreen() {
       // Agua/té puro tecleado a mano: lo sumamos como agua, no como comida.
       if (
         await tryPureWater(
-          Math.min(5000, Math.max(0, Math.round(Number(caloriesInput) || 0))),
-          Math.min(500, Math.max(0, Number(proteinInput) || 0)),
+          Math.min(5000, Math.max(0, Math.round(parseDecimalInput(caloriesInput) || 0))),
+          Math.min(500, Math.max(0, parseDecimalInput(proteinInput) || 0)),
         )
       )
         return
@@ -1223,16 +1234,19 @@ export default function ScanMealScreen() {
           name: name.trim() || 'Comida',
           // Clamp to the schema's accepted range so a typo can't make
           // the insert reject silently.
-          protein_g: Math.min(500, Math.max(0, Number(proteinInput) || 0)),
-          calories: Math.min(5000, Math.max(0, Math.round(Number(caloriesInput) || 0))),
+          protein_g: Math.min(500, Math.max(0, parseDecimalInput(proteinInput) || 0)),
+          calories: Math.min(5000, Math.max(0, Math.round(parseDecimalInput(caloriesInput) || 0))),
           consumed_at: newMealConsumedAt(),
           meal_type: mealType,
           photo_storage_path: manualPhoto,
         },
         {
           onSuccess: (meal) => {
-            const protein = Math.min(500, Math.max(0, Number(proteinInput) || 0))
-            const calories = Math.min(5000, Math.max(0, Math.round(Number(caloriesInput) || 0)))
+            const protein = Math.min(500, Math.max(0, parseDecimalInput(proteinInput) || 0))
+            const calories = Math.min(
+              5000,
+              Math.max(0, Math.round(parseDecimalInput(caloriesInput) || 0)),
+            )
             void presentLiquids(meal.id, intakeDateForNew(), false, () =>
               goToReveal(protein, { id: meal.id, calories }),
             )
@@ -1555,13 +1569,13 @@ export default function ScanMealScreen() {
                 </Pressable>
               ) : null}
 
-              <Text style={styles.eyebrow}>Tu platillo</Text>
+              <Text style={styles.eyebrow}>{isLabel ? 'Tu producto' : 'Tu platillo'}</Text>
               <View style={styles.nameField}>
                 <TextInput
                   style={styles.nameInput}
                   value={name}
                   onChangeText={setName}
-                  placeholder="Nombre del platillo"
+                  placeholder={isLabel ? 'Nombre del producto' : 'Nombre del platillo'}
                   placeholderTextColor={colors.niebla}
                 />
                 <PencilIcon color={colors.niebla} />
@@ -1599,7 +1613,7 @@ export default function ScanMealScreen() {
                       <TextInput
                         style={styles.gramsInput}
                         value={proteinInput}
-                        onChangeText={(t) => setProteinInput(t.replace(/[^0-9]/g, ''))}
+                        onChangeText={(t) => setProteinInput(t.replace(/[^0-9.,]/g, ''))}
                         placeholder="0"
                         placeholderTextColor={colors.niebla}
                         keyboardType="numeric"
@@ -1614,7 +1628,7 @@ export default function ScanMealScreen() {
                       <TextInput
                         style={styles.gramsInput}
                         value={caloriesInput}
-                        onChangeText={(t) => setCaloriesInput(t.replace(/[^0-9]/g, ''))}
+                        onChangeText={(t) => setCaloriesInput(t.replace(/[^0-9.,]/g, ''))}
                         placeholder="0"
                         placeholderTextColor={colors.niebla}
                         keyboardType="numeric"
@@ -1630,7 +1644,13 @@ export default function ScanMealScreen() {
                       un tap registra tal cual (mismo guardado, con el loop
                       "¿le atiné?" como red). El formulario sigue abajo para
                       quien quiera ajustar. Solo scans nuevos. */}
-                  {!isEdit && !isManual && confidence === 'alta' && ingredients.length > 0 ? (
+                  {/* En etiquetas no (dueña 14 oct 2026): una etiqueta mal
+                      leída guarda un error exacto y difícil de notar. */}
+                  {!isEdit &&
+                  !isManual &&
+                  !isLabel &&
+                  confidence === 'alta' &&
+                  canConfirmIngredients(ingredients) ? (
                     <View style={styles.quickSave}>
                       <PrimaryCta
                         label={`Registrar tal cual · ${Math.round(totals.protein)} g · ${Math.round(totals.calories)} kcal`}
@@ -1647,16 +1667,24 @@ export default function ScanMealScreen() {
                   ) : null}
 
                   <Text style={[styles.eyebrow, styles.eyebrowGap]}>
-                    {isEdit ? 'Ingredientes' : 'Ingredientes detectados'}
+                    {isEdit
+                      ? 'Ingredientes'
+                      : isLabel
+                        ? 'Lo que leímos de la etiqueta'
+                        : 'Ingredientes detectados'}
                   </Text>
 
                   {/* M1 · honestidad de evidencia: cuando el modelo dudó, se
                       dice — jamás fingir precisión. */}
                   {!isEdit && confidence !== 'alta' ? (
                     <Text style={styles.confidenceNote}>
-                      {confidence === 'media'
-                        ? 'Leímos tu plato, pero las porciones son un estimado. Dales un vistazo.'
-                        : 'No estamos seguros de este plato. Revisa lo que encontramos.'}
+                      {isLabel
+                        ? confidence === 'media'
+                          ? 'Leímos tu etiqueta, pero algunos números se ven borrosos. Revísalos.'
+                          : 'Esta etiqueta casi no se distingue. Revisa los números antes de guardar.'
+                        : confidence === 'media'
+                          ? 'Leímos tu plato, pero las porciones son un estimado. Dales un vistazo.'
+                          : 'No estamos seguros de este plato. Revisa lo que encontramos.'}
                     </Text>
                   ) : null}
 
@@ -1695,9 +1723,13 @@ export default function ScanMealScreen() {
                           placeholder="Ingrediente"
                           placeholderTextColor={colors.niebla}
                         />
-                        {ing.source === 'manual' ? (
+                        {ing.source === 'manual' ||
+                        ing.source === 'etiqueta' ||
+                        (ing.missing?.length ?? 0) > 0 ? (
                           /* V-07 · los 2 números reales en vez del texto
-                             calculado: sin ellos, Confirmar no pasa. */
+                             calculado: sin ellos, Confirmar no pasa. ST-004:
+                             los de la etiqueta también se editan (al cambiarlos
+                             la fila pasa a "ajustada por ti"). */
                           <View style={styles.manualMacrosRow}>
                             <TextInput
                               style={styles.manualMacroInput}
@@ -1729,6 +1761,9 @@ export default function ScanMealScreen() {
                               accessibilityLabel={`Proteína de ${ing.name || 'este ingrediente'}`}
                             />
                             <Text style={styles.manualMacroUnit}>g proteína</Text>
+                            {ing.source === 'etiqueta' ? (
+                              <Text style={styles.ingSourceTag}>de su etiqueta</Text>
+                            ) : null}
                           </View>
                         ) : (
                           <Text style={styles.ingMacros}>
@@ -1737,14 +1772,17 @@ export default function ScanMealScreen() {
                             {ingredientSugar(ing) >= 1
                               ? ` · ${Math.round(ingredientSugar(ing))} g azúcar`
                               : ''}
-                            {/* Procedencia visible (V-08): los números de la
-                                etiqueta se distinguen de los estimados. */}
-                            {ing.source === 'etiqueta' ? (
-                              <Text style={styles.ingSourceTag}> · de su etiqueta</Text>
-                            ) : null}
                           </Text>
                         )}
-                        {ing.source === 'manual' && ingredientKcal(ing) <= 0 ? (
+                        {(ing.missing?.length ?? 0) > 0 ? (
+                          <Text style={styles.manualHint}>
+                            {ing.missing!.length === 2
+                              ? 'Las kcal y la proteína no se leyeron en la etiqueta. Escríbelas.'
+                              : ing.missing![0] === 'kcal'
+                                ? 'Las kcal no se leyeron en la etiqueta. Escríbelas.'
+                                : 'La proteína no se leyó en la etiqueta. Escríbela.'}
+                          </Text>
+                        ) : ing.source === 'manual' && ingredientKcal(ing) <= 0 ? (
                           <Text style={styles.manualHint}>
                             Sus kcal y proteína: de la etiqueta o tu mejor cálculo.
                           </Text>
@@ -1823,10 +1861,9 @@ export default function ScanMealScreen() {
                 disabled={
                   isManual
                     ? !proteinInput.trim() || !caloriesInput.trim()
-                    : // Un ingrediente manual sin sus kcal reales no puede
-                      // entrar al motor (V-07: nunca inventar en silencio).
-                      ingredients.length === 0 ||
-                      ingredients.some((i) => i.source === 'manual' && ingredientKcal(i) <= 0)
+                    : // Ni un manual sin sus kcal reales ni un dato que la
+                      // etiqueta no trajo (V-07/ST-004: nunca inventar).
+                      !canConfirmIngredients(ingredients)
                 }
                 loading={saving}
                 loadingLabel="Guardando…"

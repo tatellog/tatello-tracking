@@ -12,7 +12,13 @@ import { DISHES, type DishIngredient } from './dishes'
  *  (Fase 3 B). Ausente en datos viejos = 'ia'. */
 export type IngredientSource = 'ia' | 'manual' | 'base' | 'etiqueta'
 
-export type ScannedIngredient = DishIngredient & { id: string; source?: IngredientSource }
+export type ScannedIngredient = DishIngredient & {
+  id: string
+  source?: IngredientSource
+  /** Datos que la etiqueta no trajo o no se leyeron (ST-004): la fila los
+   *  pide antes de guardar; su per-100 vale 0 solo como hueco, nunca como dato. */
+  missing?: ('kcal' | 'protein')[]
+}
 
 /** Cuánto confía el modelo en su lectura (M1: honestidad de evidencia).
  *  'media'/'baja' → la UI invita a revisar porciones en vez de fingir. */
@@ -78,29 +84,44 @@ const ScanResponseSchema = z.object({
     z.object({
       name: z.string(),
       grams: z.number(),
-      proteinPer100: z.number(),
-      kcalPer100: z.number(),
+      // null = la etiqueta no lo trae o no se leyó (ST-004): se pide, no se inventa.
+      proteinPer100: z.number().nullable(),
+      kcalPer100: z.number().nullable(),
       // Optional so a response (or mock) without sugar still parses.
       sugarPer100: z.number().optional(),
     }),
   ),
 })
 
+type RawIngredient = Omit<DishIngredient, 'proteinPer100' | 'kcalPer100'> & {
+  proteinPer100: number | null
+  kcalPer100: number | null
+}
+
 function withIds(
   meal: {
     name: string
-    ingredients: DishIngredient[]
+    ingredients: RawIngredient[]
     confidence?: ScanConfidence
   },
   source?: IngredientSource,
 ): ScannedMeal {
   return {
     name: meal.name,
-    ingredients: meal.ingredients.map((ing, i) => ({
-      ...ing,
-      id: `ing-${i}`,
-      ...(source ? { source } : {}),
-    })),
+    ingredients: meal.ingredients.map((ing, i) => {
+      const missing = [
+        ...(ing.kcalPer100 == null ? (['kcal'] as const) : []),
+        ...(ing.proteinPer100 == null ? (['protein'] as const) : []),
+      ]
+      return {
+        ...ing,
+        proteinPer100: ing.proteinPer100 ?? 0,
+        kcalPer100: ing.kcalPer100 ?? 0,
+        id: `ing-${i}`,
+        ...(source ? { source } : {}),
+        ...(missing.length > 0 ? { missing } : {}),
+      }
+    }),
     confidence: meal.confidence ?? 'alta',
   }
 }

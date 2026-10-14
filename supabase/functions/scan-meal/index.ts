@@ -50,8 +50,17 @@ const TextRequestSchema = z.object({
 const IngredientSchema = z.object({
   name: z.string().trim().min(1).max(60),
   grams: z.coerce.number().min(0).max(2000),
-  proteinPer100: z.coerce.number().min(0).max(100),
-  kcalPer100: z.coerce.number().min(0).max(900),
+  // null = no viene en la etiqueta o no se leyó (ST-004): llega como hueco y
+  // la app lo pide. Antes z.coerce convertía null en 0 y se guardaba 0 como
+  // si fuera dato de la etiqueta.
+  proteinPer100: z.preprocess(
+    (v) => (v === undefined || v === '' ? null : v),
+    z.coerce.number().min(0).max(100).nullable(),
+  ),
+  kcalPer100: z.preprocess(
+    (v) => (v === undefined || v === '' ? null : v),
+    z.coerce.number().min(0).max(900).nullable(),
+  ),
   // Default 0 so a meal the model reports without sugar still validates.
   sugarPer100: z.coerce.number().min(0).max(100).default(0),
 })
@@ -105,13 +114,15 @@ const LABEL_SYSTEM_PROMPT = [
   'los mililitros como gramos). Si la etiqueta solo declara por 100 g/ml, usa 100.',
   'proteinPer100 / kcalPer100 / sugarPer100 = los valores POR 100 g/ml. Si la etiqueta declara',
   'solo por porción, normalízalos a 100 con la porción declarada.',
+  'Si la proteína o la energía (kcal) NO aparecen en la etiqueta o no se pueden leer, pon null',
+  'en ese campo. Nunca inventes un valor ni pongas 0 en su lugar.',
   'confidence: "alta" SOLO si los números se leen con claridad; "media" si algunos se leen',
   'borrosos o la porción es dudosa; "baja" si apenas se distinguen. Sé honesto: es mejor',
   'declarar duda que inventar un número.',
   'Si la imagen NO es una etiqueta nutrimental (es un plato, u otra cosa), devuelve',
   '{"name":"","ingredients":[]}.',
   'Responde con este formato exacto:',
-  '{"name": string, "confidence": "alta"|"media"|"baja", "ingredients": [{"name": string, "grams": number, "proteinPer100": number, "kcalPer100": number, "sugarPer100": number}]}',
+  '{"name": string, "confidence": "alta"|"media"|"baja", "ingredients": [{"name": string, "grams": number, "proteinPer100": number|null, "kcalPer100": number|null, "sugarPer100": number}]}',
 ].join(' ')
 
 const TEXT_SYSTEM_PROMPT = [
