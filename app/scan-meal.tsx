@@ -39,6 +39,7 @@ import { PrimaryCta } from '@/components/PrimaryCta'
 import { StarLoader } from '@/components/StarLoader'
 import {
   mealIngredients,
+  mealScanMeta,
   mealPhotoSignedUrl,
   uploadMealPhoto,
   type MealInput,
@@ -66,6 +67,7 @@ import {
   scanMealFromText,
   scanNutritionLabel,
   type ScanConfidence,
+  type ScannedLabel,
   type ScannedIngredient,
 } from '@/features/meal-scan/scan'
 import {
@@ -666,6 +668,9 @@ export default function ScanMealScreen() {
   const populatedRef = useRef(false)
   // M1 · honestidad de evidencia: cuánto confió el modelo en su lectura.
   const [confidence, setConfidence] = useState<ScanConfidence>('alta')
+  // ST-004 · en etiquetas, la base y la porción declaradas (se guardan para
+  // auditar la conversión a per-100).
+  const [scannedLabel, setScannedLabel] = useState<ScannedLabel | null>(null)
   // M1 · escalador de porción de un tap: gramos ORIGINALES del scan por id
   // (la escala siempre se aplica sobre la base, no sobre sí misma).
   const baseGramsRef = useRef<Map<string, number>>(new Map())
@@ -717,6 +722,7 @@ export default function ScanMealScreen() {
         const scannedIds = new Set(baseGramsRef.current.keys())
         setIngredients((prev) => mergeRescan(meal.ingredients, prev, scannedIds))
         setConfidence(meal.confidence)
+        setScannedLabel(meal.label ?? null)
         baseGramsRef.current = new Map(meal.ingredients.map((i) => [i.id, i.grams]))
         setPortionScale(1)
         // Nada que leer (no era una etiqueta, o no se vio comida): se dice,
@@ -1201,7 +1207,8 @@ export default function ScanMealScreen() {
     if (saving) return
     if (isManual) {
       if (!proteinInput.trim() || !caloriesInput.trim()) return
-    } else if (ingredients.length === 0) {
+    } else if (!canConfirmIngredients(ingredients)) {
+      // Nunca un dato faltante ni un manual sin kcal (ST-004 · V-07).
       return
     }
     setSaving(true)
@@ -1302,6 +1309,8 @@ export default function ScanMealScreen() {
             consumed_at: new Date(editMeal.data.consumed_at),
             meal_type: mealType,
             ingredients: storedIngredients,
+            // La lectura original del scan se conserva al editar.
+            scan: mealScanMeta(editMeal.data),
             ...(photoPath ? { photo_storage_path: photoPath } : {}),
           },
         },
@@ -1340,6 +1349,9 @@ export default function ScanMealScreen() {
         meal_type: mealType,
         photo_storage_path: photoPath,
         ingredients: storedIngredients,
+        // ST-004 · H6/H10: de dónde salió y qué tan segura fue la lectura.
+        source: isLabel ? 'label' : isDescribe ? 'text_ai' : 'photo_ai',
+        scan: { confidence, label: isLabel ? scannedLabel : null },
       },
       {
         onSuccess: (meal) => {

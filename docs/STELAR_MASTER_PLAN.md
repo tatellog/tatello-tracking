@@ -727,6 +727,17 @@ Copy/paste the following into a Claude coding session:
 - **Deploy:** la edge `scan-meal` debe desplegarse antes del merge (memoria del repo). Una app vieja que reciba un `null` muestra "no pudimos leer" en vez de guardar 0.
 - **Pendiente ST-004:** H3 (devolver porción declarada y base para auditar la conversión), H6 (`source='etiqueta'` en `meals`, migración), confianza persistida (H10), validación con etiquetas reales.
 
+### 2026-10-14 — ST-004 corte 2 (la conversión de la etiqueta la hace código) — rama `master-plan-integrity`
+
+- **Cambio:**
+  - H3: `supabase/functions/_shared/nutrition-label.ts` (nuevo, puro; re-export `features/meal-scan/nutrition-label.ts`): `normalizeLabel` pasa lo impreso (base `per100`/`perServing`, porción declarada, kcal/proteína/azúcar) a per-100. Por porción sin porción declarada → null (se pide); un per-100 imposible (kcal > 900, proteína > 100) → null en vez de tumbar el escaneo. La edge en modo etiqueta pide al modelo COPIAR la etiqueta (no convertir) y responde con la forma de siempre + `label: { basis, servingGrams }`.
+  - H10: la comida guarda `ai_raw_response.scan = { confidence, label }`; `mealScanMeta` la lee y se conserva al editar.
+  - H6: `meals.source` = `manual` / `photo_ai` / `text_ai` / `label` según el flujo; migración `20261014160000_meals_source_label.sql` amplía el check.
+  - `handleConfirm` usa `canConfirmIngredients` también (red además del botón).
+- **Tests:** jest 115 / 1409 ✓ (`nutrition-label.test.ts`, `meal-scan-meta.test.ts`), tsc ✓, eslint ✓.
+- **Orden de deploy (importante):** 1) aplicar la migración ANTES de probar la app nueva (sin ella, guardar una comida escaneada falla por el check); 2) desplegar `scan-meal`; 3) merge. Una app vieja con la edge nueva sigue funcionando (el campo `label` se ignora).
+- **Pendiente ST-004:** validar con etiquetas reales (por 100 g, por porción, sin porción, borrosa, foto que no es etiqueta).
+
 ---
 
 ## 11. DECISION LOG — DO NOT SILENTLY REVERSE

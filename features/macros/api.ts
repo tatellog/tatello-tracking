@@ -60,19 +60,34 @@ export type StoredIngredient = {
 
 const INGREDIENT_SOURCES: readonly string[] = ['ia', 'manual', 'base', 'etiqueta']
 
+/** De dónde salió la comida (ST-004 · H6): `meals.source`. */
+export type MealSource = 'manual' | 'photo_ai' | 'text_ai' | 'label'
+
+/** Lo que dijo el scan, para auditar después (ST-004 · H3/H10): cuánto
+ *  confió el modelo y, en etiquetas, la base y la porción declaradas. */
+export type MealScanMeta = {
+  confidence: 'alta' | 'media' | 'baja'
+  label?: { basis: 'per100' | 'perServing'; servingGrams: number | null } | null
+}
+
 export type CreateMealInput = MealInput & {
   photo_storage_path?: string | null
   ingredients?: StoredIngredient[]
+  source?: MealSource
+  scan?: MealScanMeta | null
 }
 
 export type UpdateMealInput = MealInput & {
   ingredients?: StoredIngredient[]
   photo_storage_path?: string | null
+  /** La lectura original del scan: se conserva al editar los ingredientes. */
+  scan?: MealScanMeta | null
 }
 
-function ingredientsPayload(ingredients?: StoredIngredient[]): Json {
+function ingredientsPayload(ingredients?: StoredIngredient[], scan?: MealScanMeta | null): Json {
   if (!ingredients || ingredients.length === 0) return null
   return {
+    ...(scan ? { scan: scan as unknown as Json } : {}),
     ingredients: ingredients.map(
       ({ name, grams, proteinPer100, kcalPer100, sugarPer100, source }) => ({
         name,
@@ -114,6 +129,25 @@ function parseIngredients(raw: Json | null): StoredIngredient[] | null {
     }
   }
   return parsed.length > 0 ? parsed : null
+}
+
+/** La lectura del scan guardada con la comida (ST-004), o null. */
+export function mealScanMeta(meal: Pick<Meal, 'ai_raw_response'>): MealScanMeta | null {
+  const raw = meal.ai_raw_response
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+  const scan = (raw as { scan?: unknown }).scan
+  if (!scan || typeof scan !== 'object') return null
+  const s = scan as Record<string, unknown>
+  if (s.confidence !== 'alta' && s.confidence !== 'media' && s.confidence !== 'baja') return null
+  const l = s.label as Record<string, unknown> | null | undefined
+  const label =
+    l && (l.basis === 'per100' || l.basis === 'perServing')
+      ? {
+          basis: l.basis as 'per100' | 'perServing',
+          servingGrams: typeof l.servingGrams === 'number' ? l.servingGrams : null,
+        }
+      : null
+  return { confidence: s.confidence, label }
 }
 
 /** A meal's stored ingredient breakdown, or null when it has none. */
@@ -290,9 +324,9 @@ export async function createMeal(input: CreateMealInput): Promise<Meal> {
       calories: parsed.calories,
       consumed_at: parsed.consumed_at.toISOString(),
       meal_type: parsed.meal_type,
-      source: 'manual',
+      source: input.source ?? 'manual',
       photo_storage_path: input.photo_storage_path ?? null,
-      ai_raw_response: ingredientsPayload(input.ingredients),
+      ai_raw_response: ingredientsPayload(input.ingredients, input.scan),
     })
     .select()
     .single()
@@ -346,7 +380,9 @@ export async function updateMeal(id: string, input: UpdateMealInput): Promise<Me
   }
   // Only touch the ingredient breakdown when the caller supplies one,
   // so a plain field edit never wipes a scanned meal's ingredients.
-  if (input.ingredients) patch.ai_raw_response = ingredientsPayload(input.ingredients)
+  if (input.ingredients) {
+    patch.ai_raw_response = ingredientsPayload(input.ingredients, input.scan)
+  }
   // Likewise the photo — only when a new one was attached.
   if (input.photo_storage_path !== undefined) patch.photo_storage_path = input.photo_storage_path
   const { data, error } = await supabase.from('meals').update(patch).eq('id', id).select().single()

@@ -24,10 +24,15 @@ export type ScannedIngredient = DishIngredient & {
  *  'media'/'baja' → la UI invita a revisar porciones en vez de fingir. */
 export type ScanConfidence = 'alta' | 'media' | 'baja'
 
+/** En etiquetas: cómo declaraba sus números y su porción (ST-004 · H3),
+ *  para auditar la conversión a per-100 que hizo el código. */
+export type ScannedLabel = { basis: 'per100' | 'perServing'; servingGrams: number | null }
+
 export type ScannedMeal = {
   name: string
   ingredients: ScannedIngredient[]
   confidence: ScanConfidence
+  label?: ScannedLabel | null
 }
 
 /** Protein (g) for an ingredient at its current grams. */
@@ -80,6 +85,10 @@ const ScanResponseSchema = z.object({
   // Funciones viejas (pre-M1) no la devuelven → default honesto 'alta'
   // (se comportan exactamente como antes).
   confidence: z.enum(['alta', 'media', 'baja']).default('alta'),
+  label: z
+    .object({ basis: z.enum(['per100', 'perServing']), servingGrams: z.number().nullable() })
+    .nullable()
+    .optional(),
   ingredients: z.array(
     z.object({
       name: z.string(),
@@ -103,6 +112,7 @@ function withIds(
     name: string
     ingredients: RawIngredient[]
     confidence?: ScanConfidence
+    label?: ScannedLabel | null
   },
   source?: IngredientSource,
 ): ScannedMeal {
@@ -123,6 +133,7 @@ function withIds(
       }
     }),
     confidence: meal.confidence ?? 'alta',
+    ...(meal.label !== undefined ? { label: meal.label } : {}),
   }
 }
 

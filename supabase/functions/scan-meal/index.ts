@@ -18,6 +18,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { z } from 'https://esm.sh/zod@3.23.8'
 
+import { normalizeLabel } from '../_shared/nutrition-label.ts'
+
 const corsHeaders: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -64,6 +66,28 @@ const IngredientSchema = z.object({
   // Default 0 so a meal the model reports without sugar still validates.
   sugarPer100: z.coerce.number().min(0).max(100).default(0),
 })
+// Lo que el modelo copia de la etiqueta (ST-004 · H3): tal cual impreso; la
+// conversión a per-100 la hace normalizeLabel (_shared/nutrition-label.ts).
+// "12 g", "3,4" o un número: se lee; vacío, basura o negativo → null (se pide).
+const nullableNumber = z.preprocess((v) => {
+  if (v === undefined || v === null || v === '') return null
+  const n = typeof v === 'string' ? parseFloat(v.replace(',', '.')) : Number(v)
+  return Number.isFinite(n) && n >= 0 ? n : null
+}, z.number().nullable())
+const LabelModelSchema = z.object({
+  name: z.string().trim().max(80),
+  confidence: z.enum(['alta', 'media', 'baja']).default('media'),
+  label: z
+    .object({
+      basis: z.enum(['per100', 'perServing']),
+      servingGrams: nullableNumber,
+      kcal: nullableNumber,
+      protein: nullableNumber,
+      sugar: nullableNumber,
+    })
+    .nullable(),
+})
+
 const MealSchema = z.object({
   name: z.string().trim().max(80),
   ingredients: z.array(IngredientSchema).max(12),
@@ -105,24 +129,21 @@ const PHOTO_SYSTEM_PROMPT = [
 // porción del cliente (½/¾/1/1½) escalan gratis. Números NORMALIZADOS a
 // per-100 (las etiquetas MX declaran por 100 g/ml y/o por porción).
 const LABEL_SYSTEM_PROMPT = [
-  'Eres un nutricionista que LEE ETIQUETAS NUTRIMENTALES (tabla de información',
-  'nutricional de un empaque) y devuelve SOLO JSON válido.',
-  'Lee los números DE LA ETIQUETA, no valores típicos: kcal (energía), proteína y azúcares.',
-  'Devuelve UN solo elemento en "ingredients": el producto.',
+  'Eres un asistente que COPIA la tabla de información nutrimental de un empaque y devuelve SOLO',
+  'JSON válido. No calcules ni conviertas nada: copia los números tal como están impresos.',
   'name = el nombre del producto si se ve en el empaque (si no, describe el tipo de producto).',
-  'grams = el contenido de UNA porción declarada en la etiqueta, en gramos (para líquidos usa',
-  'los mililitros como gramos). Si la etiqueta solo declara por 100 g/ml, usa 100.',
-  'proteinPer100 / kcalPer100 / sugarPer100 = los valores POR 100 g/ml. Si la etiqueta declara',
-  'solo por porción, normalízalos a 100 con la porción declarada.',
-  'Si la proteína o la energía (kcal) NO aparecen en la etiqueta o no se pueden leer, pon null',
-  'en ese campo. Nunca inventes un valor ni pongas 0 en su lugar.',
+  'basis = "per100" si los números de energía y proteína que copias están declarados por 100 g/ml;',
+  '"perServing" si están declarados por porción. Si la etiqueta trae ambas columnas, copia la',
+  'de 100 g/ml.',
+  'servingGrams = el tamaño de UNA porción declarada, en gramos (para líquidos, los mililitros);',
+  'null si no se ve.',
+  'kcal, protein, sugar = la energía (kcal), la proteína (g) y los azúcares (g) de esa columna.',
+  'Si un valor NO aparece o no se puede leer, pon null. Nunca inventes ni pongas 0 en su lugar.',
   'confidence: "alta" SOLO si los números se leen con claridad; "media" si algunos se leen',
-  'borrosos o la porción es dudosa; "baja" si apenas se distinguen. Sé honesto: es mejor',
-  'declarar duda que inventar un número.',
-  'Si la imagen NO es una etiqueta nutrimental (es un plato, u otra cosa), devuelve',
-  '{"name":"","ingredients":[]}.',
+  'borrosos o la porción es dudosa; "baja" si apenas se distinguen.',
+  'Si la imagen NO es una etiqueta nutrimental, devuelve {"name":"","confidence":"baja","label":null}.',
   'Responde con este formato exacto:',
-  '{"name": string, "confidence": "alta"|"media"|"baja", "ingredients": [{"name": string, "grams": number, "proteinPer100": number|null, "kcalPer100": number|null, "sugarPer100": number}]}',
+  '{"name": string, "confidence": "alta"|"media"|"baja", "label": {"basis": "per100"|"perServing", "servingGrams": number|null, "kcal": number|null, "protein": number|null, "sugar": number|null} | null}',
 ].join(' ')
 
 const TEXT_SYSTEM_PROMPT = [
@@ -136,7 +157,7 @@ const TEXT_SYSTEM_PROMPT = [
 // One gpt-4o-mini completion → validated meal, or null on any failure
 // (network / non-OK / bad JSON / schema). The handler maps null to a warm
 // generic error so raw model/network strings never reach the client.
-async function analyzeMeal(messages: unknown[], openaiKey: string) {
+async function completeJson(messages: unknown[], openaiKey: string): Promise<unknown | null> {
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: { Authorization: `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
@@ -159,19 +180,44 @@ async function analyzeMeal(messages: unknown[], openaiKey: string) {
     console.error('scan-meal: no content in completion')
     return null
   }
-  let raw: unknown
   try {
-    raw = JSON.parse(content)
+    return JSON.parse(content)
   } catch {
     console.error('scan-meal: model did not return valid JSON')
     return null
   }
+}
+
+async function analyzeMeal(messages: unknown[], openaiKey: string) {
+  const raw = await completeJson(messages, openaiKey)
+  if (raw == null) return null
   const meal = MealSchema.safeParse(raw)
   if (!meal.success) {
     console.error('scan-meal: model JSON failed validation', meal.error.message)
     return null
   }
   return meal.data
+}
+
+// Etiqueta (ST-004 · H3): el modelo copia, el código convierte. La respuesta
+// conserva la forma de siempre (un ingrediente per-100) más `label` con la
+// base y la porción declaradas, para auditar la conversión.
+async function analyzeLabel(messages: unknown[], openaiKey: string) {
+  const raw = await completeJson(messages, openaiKey)
+  if (raw == null) return null
+  const parsed = LabelModelSchema.safeParse(raw)
+  if (!parsed.success) {
+    console.error('scan-meal: label JSON failed validation', parsed.error.message)
+    return null
+  }
+  const { name, confidence, label } = parsed.data
+  if (!label) return { name: '', confidence, ingredients: [], label: null }
+  return {
+    name,
+    confidence,
+    ingredients: [normalizeLabel(name || 'Producto', label)],
+    label: { basis: label.basis, servingGrams: label.servingGrams },
+  }
 }
 
 Deno.serve(async (req: Request) => {
@@ -202,9 +248,11 @@ Deno.serve(async (req: Request) => {
     const textReq = TextRequestSchema.safeParse(body)
 
     let messages: unknown[]
+    let labelMode = false
     if (photoReq.success) {
       const { imageBase64, mimeType, mode } = photoReq.data
       const isLabel = mode === 'etiqueta'
+      labelMode = isLabel
       messages = [
         { role: 'system', content: isLabel ? LABEL_SYSTEM_PROMPT : PHOTO_SYSTEM_PROMPT },
         {
@@ -241,7 +289,9 @@ Deno.serve(async (req: Request) => {
       return json({ error: 'Entrada inválida.' }, 400)
     }
 
-    const meal = await analyzeMeal(messages, openaiKey)
+    const meal = labelMode
+      ? await analyzeLabel(messages, openaiKey)
+      : await analyzeMeal(messages, openaiKey)
     if (!meal) return json({ error: 'No pudimos leer tu plato. Intenta de nuevo.' }, 502)
 
     return json(meal)
