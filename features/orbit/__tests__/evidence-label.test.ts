@@ -9,7 +9,13 @@ import {
   splitEvidenceBars,
 } from '../evidence-label'
 import { detectMonthPatterns } from '../month-built'
-import { rankSurprises, rescueAfterOver, shortNightEffect } from '../surprise'
+import {
+  rankSurprises,
+  rescueAfterOver,
+  shortNightEffect,
+  stepsDeficit,
+  surpriseToday,
+} from '../surprise'
 import { addDays, mkSig, monIdxUTC } from './signals.fixture'
 
 /*
@@ -346,5 +352,57 @@ describe('"Lo que no sabías" · fuente y días del detalle (ST-006)', () => {
       { calorieTarget: TARGET },
     )!
     expect(r.daysLabel).toBe('El día después')
+  })
+})
+
+describe('detalle estilo Fitness: comparación en números y "hoy" (ST-006)', () => {
+  const stepSignals = month(12, (i) => ({
+    meal_count: 2,
+    steps: i % 2 === 0 ? 9000 : 2000,
+    calories: i % 2 === 0 ? 1400 : 2400,
+  }))
+
+  it('los anillos usan los mismos conteos que las filas', () => {
+    const s = stepsDeficit(stepSignals, { calorieTarget: TARGET })!
+    expect(s.compare?.strong).toMatchObject({ hits: 6, total: 6 })
+    expect(s.compare?.other).toMatchObject({ hits: 0, total: 6 })
+    expect(s.rows[0]!.value).toBe(`${s.compare!.strong.hits} de ${s.compare!.strong.total}`)
+    expect(s.rows[1]!.value).toBe(`${s.compare!.other.hits} de ${s.compare!.other.total}`)
+    expect(s.compare!.strong.days).toHaveLength(6)
+    expect(s.hitDays).toHaveLength(6)
+  })
+
+  it('el corte de hoy es el mismo número que dice la frase', () => {
+    const s = stepsDeficit(stepSignals, { calorieTarget: TARGET })!
+    expect(s.headline).toContain(s.threshold!.value.toLocaleString('es-MX'))
+  })
+
+  it('hoy debajo del corte: dice cuánto falta', () => {
+    const t = surpriseToday({ threshold: { kind: 'steps', value: 3000 } }, { steps: 1800 })!
+    expect(t.text).toBe('Hoy llevas 1,800 pasos. Te faltan 1,200 para los 3,000.')
+    expect(t.reached).toBe(false)
+  })
+
+  it('hoy ya pasó el corte: lo dice, sin pedir más', () => {
+    const t = surpriseToday({ threshold: { kind: 'steps', value: 3000 } }, { steps: 4200 })!
+    expect(t.text).toBe('Hoy llevas 4,200 pasos: ya pasaste los 3,000.')
+    expect(t.reached).toBe(true)
+  })
+
+  it('sin pasos de hoy o sin corte: no se dibuja (nunca se estima)', () => {
+    expect(surpriseToday({ threshold: { kind: 'steps', value: 3000 } }, { steps: null })).toBeNull()
+    expect(surpriseToday({ threshold: { kind: 'steps', value: 3000 } }, undefined)).toBeNull()
+    expect(surpriseToday({}, { steps: 5000 })).toBeNull()
+  })
+
+  it('los hallazgos de promedio no traen anillos; traen sus dos grupos de días', () => {
+    const signals = month(14, (i) => ({
+      meal_count: 3,
+      sleep_minutes: i % 2 === 0 ? 300 : 450,
+      calories: i % 2 === 0 ? 2100 : 1500,
+    }))
+    const s = shortNightEffect(signals)!
+    expect(s.compare).toBeUndefined()
+    expect(s.otherDays).toHaveLength(7)
   })
 })

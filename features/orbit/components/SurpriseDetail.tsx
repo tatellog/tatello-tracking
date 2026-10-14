@@ -1,0 +1,687 @@
+/*
+ * El detalle de "Lo que no sabías" (ST-006 · D-03) como MOMENTO de
+ * descubrimiento (dueña 13 oct 2026: "se supone que es un nuevo
+ * descubrimiento"; revisión UX): pantalla completa, un solo héroe.
+ *
+ *   · Eyebrow en el color del dato: la primera vez "Nuevo patrón encontrado";
+ *     después, su etiqueta de evidencia.
+ *   · Íconos de lo que se cruza (gramática de Destacados de Salud).
+ *   · HÉROE: un anillo grande en el color del dato con el número que cuenta
+ *     ("9 de 11 días"). El otro lado baja a una fila chica, sin pelear.
+ *     Hallazgos de promedio (kcal, g): el valor fuerte como héroe numérico.
+ *   · La frase, luego HOY (lo que puedes hacer con esto), luego la evidencia en
+ *     una línea, y "Lo que todavía no sabemos" al pie.
+ *
+ * Primera vez: el anillo se llena mientras el número cuenta; al cerrar, una
+ * corona de chispas en el color del dato + háptico, y entra el resto. Un toque
+ * en el héroe salta la secuencia; reduce-motion la quita. Visitas siguientes:
+ * todo ya dibujado. Sin ✦: lo encontró el motor (regla IA visible). Copy plano,
+ * evidencia primero, sin cierre poético.
+ */
+import { MaterialCommunityIcons } from '@expo/vector-icons'
+import * as Haptics from 'expo-haptics'
+import { useEffect, useRef, useState } from 'react'
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import Animated, {
+  Easing,
+  FadeIn,
+  useAnimatedProps,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withDelay,
+  withTiming,
+  type SharedValue,
+} from 'react-native-reanimated'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import Svg, { Circle, Defs, RadialGradient, Stop } from 'react-native-svg'
+
+import { colors, typography } from '@/theme'
+
+import { EVIDENCE_LABEL_TEXT, type EvidenceLabel } from '../evidence-label'
+import { evidenceLook, type EvidenceLook } from '../evidence-highlight'
+import type { Surprise, SurpriseSide, SurpriseToday } from '../surprise'
+
+const AnimatedCircle = Animated.createAnimatedComponent(Circle)
+
+const HERO = 232
+const HERO_STROKE = 22
+const MINI = 40
+const MINI_STROKE = 5
+const FILL_MS = 1100
+const FILL_DELAY = 350
+const SPARKS = 16
+const HALO = HERO * 1.5
+
+/* ── Anillo ─────────────────────────────────────────────────────────── */
+
+function Ring({
+  size,
+  stroke,
+  color,
+  track,
+  progress,
+  pct,
+}: {
+  size: number
+  stroke: number
+  color: string
+  track: string
+  progress: SharedValue<number>
+  pct: number
+}) {
+  const r = size / 2 - stroke / 2 - 1
+  const c = 2 * Math.PI * r
+  const animatedProps = useAnimatedProps(() => ({
+    strokeDasharray: [c * pct * progress.value, c],
+  }))
+  return (
+    <Svg
+      width={size}
+      height={size}
+      viewBox={`0 0 ${size} ${size}`}
+      style={{ transform: [{ rotate: '-90deg' }] }}
+    >
+      <Circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={track} strokeWidth={stroke} />
+      <AnimatedCircle
+        cx={size / 2}
+        cy={size / 2}
+        r={r}
+        fill="none"
+        stroke={color}
+        strokeWidth={stroke}
+        strokeLinecap="round"
+        animatedProps={animatedProps}
+      />
+    </Svg>
+  )
+}
+
+/* ── Corona de chispas (solo la primera vez) ─────────────────────────── */
+
+function Spark({
+  t,
+  angle,
+  color,
+  radius,
+}: {
+  t: SharedValue<number>
+  angle: number
+  color: string
+  radius: number
+}) {
+  const style = useAnimatedStyle(() => {
+    const d = radius + t.value * 46
+    return {
+      opacity: t.value <= 0 ? 0 : 1 - t.value,
+      transform: [
+        { translateX: Math.cos(angle) * d },
+        { translateY: Math.sin(angle) * d },
+        { scale: 1 - t.value * 0.5 },
+      ],
+    }
+  })
+  return <Animated.View style={[styles.spark, { backgroundColor: color }, style]} />
+}
+
+function SparkCrown({ t, color }: { t: SharedValue<number>; color: string }) {
+  const radius = HERO / 2 - HERO_STROKE / 2
+  return (
+    <View style={styles.sparkLayer} pointerEvents="none">
+      {Array.from({ length: SPARKS }, (_, i) => (
+        <Spark
+          key={i}
+          t={t}
+          angle={(i / SPARKS) * Math.PI * 2 - Math.PI / 2}
+          color={i % 3 === 0 ? colors.oroLeche : color}
+          radius={radius}
+        />
+      ))}
+    </View>
+  )
+}
+
+/* ── Héroe ──────────────────────────────────────────────────────────── */
+
+/** El número que cuenta hasta `to` en `ms` (JS, una sola vez). */
+function useCountUp(to: number, ms: number, delay: number, run: boolean): number {
+  const [n, setN] = useState(run ? 0 : to)
+  useEffect(() => {
+    if (!run) {
+      setN(to)
+      return
+    }
+    let raf = 0
+    const start = Date.now() + delay
+    const tick = () => {
+      const k = Math.min(1, Math.max(0, (Date.now() - start) / ms))
+      setN(Math.round(to * (1 - Math.pow(1 - k, 3))))
+      if (k < 1) raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [to, ms, delay, run])
+  return n
+}
+
+function RateHero({
+  strong,
+  other,
+  accent,
+  reveal,
+  onRevealed,
+}: {
+  strong: SurpriseSide
+  other: SurpriseSide
+  accent: string
+  reveal: boolean
+  onRevealed: () => void
+}) {
+  const pct = strong.total > 0 ? Math.min(1, strong.hits / strong.total) : 0
+  const otherPct = other.total > 0 ? Math.min(1, other.hits / other.total) : 0
+  const fill = useSharedValue(reveal ? 0 : 1)
+  const burst = useSharedValue(0)
+  const shown = useCountUp(strong.hits, FILL_MS, FILL_DELAY, reveal)
+  const done = useRef(false)
+
+  useEffect(() => {
+    if (!reveal) return
+    fill.value = withDelay(
+      FILL_DELAY,
+      withTiming(1, { duration: FILL_MS, easing: Easing.bezier(0.2, 0.7, 0.2, 1) }),
+    )
+    const timer = setTimeout(() => {
+      if (done.current) return
+      done.current = true
+      burst.value = withTiming(1, { duration: 900, easing: Easing.out(Easing.quad) })
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
+      onRevealed()
+    }, FILL_DELAY + FILL_MS)
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reveal])
+
+  return (
+    <View style={styles.heroCol}>
+      <View style={styles.heroRing}>
+        {/* Halo estático en el color del dato (degradado fijo: animar colores
+            de un gradiente crashea en device). */}
+        <Svg width={HALO} height={HALO} style={styles.halo} pointerEvents="none">
+          <Defs>
+            <RadialGradient id="surpriseHalo" cx="50%" cy="50%" r="50%">
+              <Stop offset="0" stopColor={accent} stopOpacity={0.28} />
+              <Stop offset="0.55" stopColor={accent} stopOpacity={0.08} />
+              <Stop offset="1" stopColor={accent} stopOpacity={0} />
+            </RadialGradient>
+          </Defs>
+          <Circle cx={HALO / 2} cy={HALO / 2} r={HALO / 2} fill="url(#surpriseHalo)" />
+        </Svg>
+        <Ring
+          size={HERO}
+          stroke={HERO_STROKE}
+          color={accent}
+          track={`${accent}26`}
+          progress={fill}
+          pct={pct}
+        />
+        <View style={styles.heroCenter} pointerEvents="none">
+          <Text style={styles.heroNum}>{shown}</Text>
+          <Text style={styles.heroOf}>{`de ${strong.total} días`}</Text>
+          <Text style={[styles.heroSub, { color: accent }]}>en déficit</Text>
+        </View>
+        {reveal ? <SparkCrown t={burst} color={accent} /> : null}
+      </View>
+      <Text style={styles.heroLabel}>{strong.label}</Text>
+      <View
+        style={styles.otherRow}
+        accessible
+        accessibilityLabel={`${other.label}: ${other.hits} de ${other.total} días en déficit`}
+      >
+        <Ring
+          size={MINI}
+          stroke={MINI_STROKE}
+          color={colors.niebla}
+          track={colors.hairline}
+          progress={fill}
+          pct={otherPct}
+        />
+        <Text style={styles.otherText}>
+          {`${other.label}: `}
+          <Text style={styles.otherNum}>{`${other.hits} de ${other.total}`}</Text>
+        </Text>
+      </View>
+    </View>
+  )
+}
+
+/** Hallazgo de promedio (kcal, g): el valor fuerte como héroe numérico. */
+function AverageHero({ rows, accent }: { rows: Surprise['rows']; accent: string }) {
+  const strong = rows.find((r) => r.strong) ?? rows[0]
+  const other = rows.find((r) => r !== strong)
+  if (!strong) return null
+  return (
+    <View style={styles.heroCol}>
+      <Text style={[styles.avgNum, { color: accent }]}>{strong.value}</Text>
+      <Text style={styles.heroLabel}>{strong.label}</Text>
+      {other ? (
+        <Text style={[styles.otherText, styles.avgOther]}>
+          {`${other.label}: `}
+          <Text style={styles.otherNum}>{other.value}</Text>
+        </Text>
+      ) : null}
+    </View>
+  )
+}
+
+/* ── Piezas compartidas con el modal de patrones ──────────────────────── */
+
+/** La comparación de un hallazgo de promedio: dos filas, la fuerte primero. */
+export function SurpriseRows({ rows }: { rows: Surprise['rows'] }) {
+  return (
+    <View style={styles.rows}>
+      {rows.map((r) => (
+        <View key={r.label} style={styles.row}>
+          <Text style={[styles.rowLabel, r.strong && styles.rowStrong]}>{r.label}</Text>
+          <Text style={[styles.rowValue, r.strong && styles.rowValueStrong]}>{r.value}</Text>
+        </View>
+      ))}
+    </View>
+  )
+}
+
+/** "Lo que todavía no sabemos": los límites del hallazgo. `footnote` = al pie,
+ *  en letra chica (detalle de sorpresa); si no, bloque normal. */
+export function EvidenceUnknowns({
+  lines,
+  footnote = false,
+}: {
+  lines: readonly string[] | undefined
+  footnote?: boolean
+}) {
+  if (!lines || lines.length === 0) return null
+  return (
+    <View style={[styles.unknowns, footnote && styles.unknownsFootnote]}>
+      <Text style={styles.unknownsTitle}>Lo que todavía no sabemos</Text>
+      {lines.map((u) => (
+        <Text key={u} style={[styles.unknown, footnote && styles.unknownFootnote]}>
+          {u}
+        </Text>
+      ))}
+    </View>
+  )
+}
+
+/** Hoy frente al corte del hallazgo: tu dato real y lo que falta. En curso =
+ *  color del dato; alcanzado = oro (oro = lo que ya hiciste). */
+function TodayBlock({ today, look }: { today: SurpriseToday; look: EvidenceLook }) {
+  const pct = Math.min(1, today.value / today.target)
+  const icon = look.icons[0]
+  return (
+    <View style={styles.today} accessible accessibilityLabel={today.text}>
+      <View style={styles.todayHead}>
+        {icon ? <MaterialCommunityIcons name={icon.name} size={16} color={icon.color} /> : null}
+        <Text style={[styles.todayKicker, { color: look.accent }]}>Hoy</Text>
+      </View>
+      <Text style={styles.todayText}>{today.text}</Text>
+      <View style={styles.todayTrack}>
+        <View
+          style={[
+            styles.todayFill,
+            { backgroundColor: today.reached ? colors.oro : look.accent },
+            { width: `${Math.max(3, Math.round(pct * 100))}%` },
+          ]}
+        />
+      </View>
+    </View>
+  )
+}
+
+/* ── La pantalla ────────────────────────────────────────────────────── */
+
+export function SurpriseDetailModal({
+  visible,
+  surprise,
+  label,
+  source,
+  unknowns,
+  today,
+  firstTime,
+  onClose,
+}: {
+  visible: boolean
+  surprise: Surprise
+  label: EvidenceLabel
+  source: string
+  unknowns: string[]
+  today: SurpriseToday | null
+  /** Primera apertura de este hallazgo: la revelación completa. */
+  firstTime: boolean
+  onClose: () => void
+}) {
+  const insets = useSafeAreaInsets()
+  const reduce = useReducedMotion() ?? false
+  const look = evidenceLook(surprise.id, colors.oro)
+  const compare = surprise.compare
+  const [skipped, setSkipped] = useState(false)
+  const reveal = visible && firstTime && !reduce && !skipped && compare != null
+  // El resto entra cuando el anillo cerró (o de una vez si no hay revelación).
+  const [restIn, setRestIn] = useState(!reveal)
+  useEffect(() => {
+    if (!visible) {
+      setSkipped(false)
+      return
+    }
+    setRestIn(!reveal)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible])
+
+  const eyebrow = firstTime
+    ? label === 'patron'
+      ? 'Nuevo patrón encontrado'
+      : 'Nueva observación'
+    : EVIDENCE_LABEL_TEXT[label]
+  const total = surprise.sample
+    ? (surprise.sample.total ?? surprise.sample.groups.reduce((a, g) => a + g.days, 0))
+    : null
+  const evidenceLine = [total ? `${total} días comparados` : null, source.toLowerCase()]
+    .filter(Boolean)
+    .join(' · ')
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+      statusBarTranslucent
+    >
+      <View style={styles.root}>
+        <ScrollView
+          contentContainerStyle={[
+            styles.scroll,
+            { paddingTop: insets.top + 64, paddingBottom: insets.bottom + 120 },
+          ]}
+          showsVerticalScrollIndicator={false}
+        >
+          <Text style={[styles.eyebrow, { color: look.accent }]}>{eyebrow}</Text>
+          <View style={styles.icons}>
+            {look.icons.map((icon, i) => (
+              <View
+                key={icon.name}
+                style={[
+                  styles.iconDisc,
+                  { backgroundColor: `${icon.color}33` },
+                  i > 0 && styles.iconOverlap,
+                ]}
+              >
+                <MaterialCommunityIcons name={icon.name} size={26} color={icon.color} />
+              </View>
+            ))}
+          </View>
+
+          <Pressable
+            onPress={() => {
+              if (reveal) {
+                setSkipped(true)
+                setRestIn(true)
+              }
+            }}
+            accessibilityRole={reveal ? 'button' : undefined}
+            accessibilityLabel={reveal ? 'Saltar animación' : undefined}
+          >
+            {compare ? (
+              <RateHero
+                key={reveal ? 'reveal' : 'calm'}
+                strong={compare.strong}
+                other={compare.other}
+                accent={look.accent}
+                reveal={reveal}
+                onRevealed={() => setRestIn(true)}
+              />
+            ) : (
+              <AverageHero rows={surprise.rows} accent={look.accent} />
+            )}
+          </Pressable>
+
+          {restIn ? (
+            <Animated.View entering={FadeIn.duration(firstTime ? 420 : 200)} style={styles.rest}>
+              <Text style={styles.title}>{surprise.headline}</Text>
+              {today ? <TodayBlock today={today} look={look} /> : null}
+              <Text style={styles.evidence}>{evidenceLine}</Text>
+              <EvidenceUnknowns lines={unknowns} footnote />
+            </Animated.View>
+          ) : null}
+        </ScrollView>
+
+        <Pressable
+          onPress={onClose}
+          hitSlop={14}
+          accessibilityRole="button"
+          accessibilityLabel="Cerrar"
+          style={[styles.close, { top: insets.top + 12 }]}
+        >
+          <Text style={styles.closeX}>✕</Text>
+        </Pressable>
+        <View style={[styles.ctaWrap, { paddingBottom: insets.bottom + 16 }]}>
+          <Pressable
+            onPress={onClose}
+            accessibilityRole="button"
+            style={({ pressed }) => [styles.cta, pressed && { opacity: 0.85 }]}
+          >
+            <Text style={styles.ctaText}>Listo</Text>
+          </Pressable>
+        </View>
+      </View>
+    </Modal>
+  )
+}
+
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.bg },
+  scroll: { paddingHorizontal: 24, alignItems: 'center' },
+  eyebrow: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.smallLabel,
+    letterSpacing: typography.letterSpacing.eyebrow,
+    textTransform: 'uppercase',
+    textAlign: 'center',
+  },
+  icons: { flexDirection: 'row', marginTop: 16, marginBottom: 22 },
+  iconDisc: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: colors.bg,
+  },
+  iconOverlap: { marginLeft: -10 },
+  heroCol: { alignItems: 'center' },
+  heroRing: {
+    width: HERO,
+    height: HERO,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  halo: { position: 'absolute', left: (HERO - HALO) / 2, top: (HERO - HALO) / 2 },
+  heroCenter: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroNum: {
+    fontFamily: typography.displayHeavy,
+    fontSize: typography.sizes.wheelNum,
+    lineHeight: 60,
+    color: colors.leche,
+    fontVariant: ['tabular-nums'],
+  },
+  heroOf: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.bone,
+  },
+  heroSub: {
+    marginTop: 2,
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.smallLabel,
+    letterSpacing: typography.letterSpacing.microCaption,
+    textTransform: 'uppercase',
+  },
+  heroLabel: {
+    marginTop: 16,
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.title,
+    color: colors.leche,
+    textAlign: 'center',
+  },
+  avgNum: {
+    fontFamily: typography.displayHeavy,
+    fontSize: typography.sizes.heroNum,
+    fontVariant: ['tabular-nums'],
+  },
+  avgOther: { marginTop: 10 },
+  otherRow: {
+    marginTop: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    backgroundColor: 'rgba(244, 236, 222, 0.04)',
+  },
+  otherText: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    color: colors.niebla,
+  },
+  otherNum: { fontFamily: typography.uiBold, color: colors.bone },
+  sparkLayer: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  spark: { position: 'absolute', width: 6, height: 6, borderRadius: 3 },
+  rest: { alignSelf: 'stretch', marginTop: 26, gap: 18 },
+  title: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.displayMd,
+    lineHeight: 32,
+    letterSpacing: -0.4,
+    color: colors.leche,
+    textAlign: 'center',
+  },
+  evidence: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    lineHeight: 17,
+    color: colors.niebla,
+    textAlign: 'center',
+  },
+  rows: { gap: 10 },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    gap: 12,
+    paddingBottom: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.hairline,
+  },
+  rowLabel: {
+    flex: 1,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    color: colors.niebla,
+  },
+  rowStrong: { color: colors.leche },
+  rowValue: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.niebla,
+    fontVariant: ['tabular-nums'],
+  },
+  rowValueStrong: { color: colors.oroLight },
+  today: {
+    padding: 16,
+    borderRadius: 20,
+    backgroundColor: 'rgba(244, 236, 222, 0.04)',
+    gap: 8,
+  },
+  todayHead: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  todayKicker: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.tinyLabel,
+    letterSpacing: 1.6,
+    textTransform: 'uppercase',
+  },
+  todayText: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.ui,
+    lineHeight: 20,
+    color: colors.leche,
+  },
+  todayTrack: {
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.hairline,
+    overflow: 'hidden',
+  },
+  todayFill: { height: 8, borderRadius: 4 },
+  unknowns: {
+    marginTop: 2,
+    paddingTop: 14,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.hairline,
+    gap: 8,
+  },
+  unknownsFootnote: { paddingTop: 12, gap: 4 },
+  unknownsTitle: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+    color: colors.niebla,
+  },
+  unknown: {
+    fontFamily: typography.ui,
+    fontSize: typography.sizes.body,
+    lineHeight: 21,
+    color: colors.bone,
+  },
+  unknownFootnote: {
+    fontSize: typography.sizes.label,
+    lineHeight: 17,
+    color: colors.niebla,
+  },
+  close: {
+    position: 'absolute',
+    right: 16,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(244, 236, 222, 0.08)',
+  },
+  closeX: { fontSize: typography.sizes.title, color: colors.leche },
+  ctaWrap: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    backgroundColor: colors.bg,
+  },
+  cta: {
+    height: 54,
+    borderRadius: 27,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.leche,
+  },
+  ctaText: { fontFamily: typography.uiBold, fontSize: typography.sizes.ui, color: colors.bg },
+})

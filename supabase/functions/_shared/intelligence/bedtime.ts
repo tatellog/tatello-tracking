@@ -109,6 +109,21 @@ export function lateBedtimeEffect(
     ],
     days: late.map((n) => n.day).sort(),
     daysLabel: late_label,
+    hitDays: nights.filter((n) => isDeficitDay(n.s!.calories, target)).map((n) => n.day),
+    compare: {
+      strong: {
+        label: `Tras dormirte antes ${beforeLabel(when)}`,
+        hits: ed,
+        total: early.length,
+        days: early.map((n) => n.day).sort(),
+      },
+      other: {
+        label: late_label,
+        hits: ld,
+        total: late.length,
+        days: late.map((n) => n.day).sort(),
+      },
+    },
     effect: Math.min(1, diff / 0.5),
     minSide: Math.min(late.length, early.length),
     expected: false,

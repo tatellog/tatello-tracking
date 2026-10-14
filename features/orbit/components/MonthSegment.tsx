@@ -108,8 +108,9 @@ import {
 import { useComboTranscript } from '../combo-transcript'
 import { comboKey, combosBornRecently } from '../combo-memory'
 import { useSeenCombos } from '../combo-seen'
+import { useSurpriseRevealSeen } from '../surprise-seen'
 import { bedtimeOffsetMinutes } from '../bedtime'
-import { rankSurprises, type Surprise } from '../surprise'
+import { rankSurprises, surpriseToday, type Surprise } from '../surprise'
 import { NotifyOfferSheet } from '@/features/notifications/components/NotifyOfferSheet'
 import { useNotifyOffer } from '@/features/notifications/offer'
 import { earlyReading } from '../early-readings'
@@ -117,6 +118,7 @@ import { dataMaturity } from '../maturity'
 import { useSaveReflection } from '../reflections'
 import { EvidenceChip, EvidenceComparison, EvidenceHeader } from './EvidenceHighlight'
 import { EmptySegmentCard } from './EmptySegmentCard'
+import { EvidenceUnknowns, SurpriseDetailModal, SurpriseRows } from './SurpriseDetail'
 import { ComboChatView } from './ComboChatView'
 import { MonthChatSheet } from './MonthChatSheet'
 import { MonthGlanceCalendar } from './MonthGlanceCalendar'
@@ -637,6 +639,9 @@ export function MonthSegment({
   const [evidence, setEvidence] = useState<EvidenceItem | null>(null)
   // El detalle de "Lo que no sabías" (ST-006): su propio modal, con filas.
   const [surpriseOpen, setSurpriseOpen] = useState(false)
+  // Primera apertura de ese hallazgo = la revelación (anillo, conteo, chispas).
+  const surpriseSeen = useSurpriseRevealSeen(seenUid)
+  const [surpriseFirst, setSurpriseFirst] = useState(false)
   // Abrir una evidencia cuenta como visto para el push N9: ese hallazgo no se
   // avisa en 14 días (no se manda lo que ya leíste).
   const qc = useQueryClient()
@@ -912,7 +917,11 @@ export function MonthSegment({
                       { kind: 'pattern', sample: surprise.sample },
                       maturity.stage,
                     )}
-                    onOpen={() => setSurpriseOpen(true)}
+                    onOpen={() => {
+                      setSurpriseFirst(surpriseSeen.isNew(surprise.id))
+                      surpriseSeen.markSeen(surprise.id)
+                      setSurpriseOpen(true)
+                    }}
                   />
                 ) : null}
                 {surprise && combo ? (
@@ -1131,6 +1140,11 @@ export function MonthSegment({
           label={monthPatternLabel({ kind: 'pattern', sample: surprise.sample }, maturity.stage)}
           source={patternSourceLine(surprise.id, patternSignals)}
           unknowns={evidenceUnknowns({ kind: 'pattern', sample: surprise.sample }, maturity.stage)}
+          today={surpriseToday(
+            surprise,
+            patternSignals.find((x) => x.day === today),
+          )}
+          firstTime={surpriseFirst}
           onClose={() => setSurpriseOpen(false)}
         />
       ) : null}
@@ -1694,75 +1708,6 @@ function SurpriseHero({
         </View>
       </Pressable>
     </Animated.View>
-  )
-}
-
-/** La comparación que prueba un hallazgo: dos filas, la fuerte primero. */
-function SurpriseRows({ rows }: { rows: Surprise['rows'] }) {
-  return (
-    <View style={styles.surpriseRows}>
-      {rows.map((r) => (
-        <View key={r.label} style={styles.surpriseRow}>
-          <Text style={[styles.surpriseLabel, r.strong && styles.surpriseStrong]}>{r.label}</Text>
-          <Text style={[styles.surpriseValue, r.strong && styles.surpriseValueStrong]}>
-            {r.value}
-          </Text>
-        </View>
-      ))}
-    </View>
-  )
-}
-
-/* El detalle de "Lo que no sabías" (ST-006 · D-03): qué tipo de hallazgo es,
- * la comparación, cuántos días, de dónde salen, cuáles fueron y lo que todavía
- * no sabemos. Mismo vocabulario que el modal de patrones; sin ✦ (motor). */
-function SurpriseDetailModal({
-  visible,
-  surprise,
-  label,
-  source,
-  unknowns,
-  onClose,
-}: {
-  visible: boolean
-  surprise: Surprise
-  label: EvidenceLabel
-  source: string
-  unknowns: string[]
-  onClose: () => void
-}) {
-  const sampleLine = patternSampleLine(surprise.sample)
-  return (
-    <StelarModal visible={visible} onClose={onClose}>
-      <View style={styles.evStack}>
-        <Text style={styles.evLabel}>{EVIDENCE_LABEL_TEXT[label]}</Text>
-        <Text style={styles.evTitle}>{surprise.headline}</Text>
-        <SurpriseRows rows={surprise.rows} />
-        {sampleLine ? <Text style={styles.evMeta}>{sampleLine}</Text> : null}
-        <Text style={styles.evMeta}>{source}</Text>
-        {surprise.days.length > 0 ? (
-          <Text style={styles.modalDates}>
-            {`${surprise.daysLabel}: ${formatDates(surprise.days).replace(/^Fueron/, 'fueron')}`}
-          </Text>
-        ) : null}
-        <EvidenceUnknowns lines={unknowns} />
-      </View>
-    </StelarModal>
-  )
-}
-
-/** "Lo que todavía no sabemos": los límites del hallazgo, al pie del detalle. */
-function EvidenceUnknowns({ lines }: { lines: readonly string[] | undefined }) {
-  if (!lines || lines.length === 0) return null
-  return (
-    <View style={styles.evUnknowns}>
-      <Text style={styles.evUnknownsTitle}>Lo que todavía no sabemos</Text>
-      {lines.map((u) => (
-        <Text key={u} style={styles.evUnknown}>
-          {u}
-        </Text>
-      ))}
-    </View>
   )
 }
 
@@ -2593,37 +2538,6 @@ const styles = StyleSheet.create({
     lineHeight: 30,
     color: colors.leche,
     letterSpacing: -0.2,
-  },
-  surpriseRows: {
-    marginTop: 18,
-    gap: 10,
-  },
-  surpriseRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'space-between',
-    gap: 12,
-    paddingBottom: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.hairline,
-  },
-  surpriseLabel: {
-    flex: 1,
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.body,
-    color: colors.niebla,
-  },
-  surpriseStrong: {
-    color: colors.leche,
-  },
-  surpriseValue: {
-    fontFamily: typography.uiSemi,
-    fontSize: typography.sizes.bodyLarge,
-    color: colors.niebla,
-    fontVariant: ['tabular-nums'],
-  },
-  surpriseValueStrong: {
-    color: colors.oroLight,
   },
   sustainEyebrow: {
     marginBottom: 6,
@@ -3497,26 +3411,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   // La frase serif es la protagonista: aquí vive el descubrimiento.
-  evUnknowns: {
-    marginTop: 18,
-    paddingTop: 14,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.hairline,
-    gap: 8,
-  },
-  evUnknownsTitle: {
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.label,
-    letterSpacing: 1.2,
-    textTransform: 'uppercase',
-    color: colors.niebla,
-  },
-  evUnknown: {
-    fontFamily: typography.ui,
-    fontSize: typography.sizes.body,
-    lineHeight: 21,
-    color: colors.bone,
-  },
   findingSample: {
     marginTop: 8,
     fontFamily: typography.uiMedium,

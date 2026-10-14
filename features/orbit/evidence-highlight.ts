@@ -19,6 +19,8 @@ export type EvidenceIconName =
   | 'calendar-week'
   | 'silverware-fork-knife'
   | 'star-four-points'
+  | 'walk'
+  | 'bed-clock'
 
 export type EvidenceIcon = { name: EvidenceIconName; color: string }
 
@@ -35,6 +37,8 @@ const DEFICIT: EvidenceIcon = { name: 'fire', color: colors.oro }
 const SUENO: EvidenceIcon = { name: 'moon-waning-crescent', color: colors.dimension.sueno }
 const SEMANA: EvidenceIcon = { name: 'calendar-week', color: colors.bone }
 const COMIDA: EvidenceIcon = { name: 'silverware-fork-knife', color: colors.dimension.alimento }
+const PASOS: EvidenceIcon = { name: 'walk', color: colors.signal.entreno }
+const DORMIRSE: EvidenceIcon = { name: 'bed-clock', color: colors.dimension.sueno }
 
 const LOOKS: Record<string, EvidenceLook> = {
   'training-protein': {
@@ -54,6 +58,17 @@ const LOOKS: Record<string, EvidenceLook> = {
   'surplus-concentration': { kicker: 'Comida', accent: colors.bone, icons: [SEMANA, COMIDA] },
   'weekend-surplus': { kicker: 'Comida', accent: colors.bone, icons: [SEMANA, COMIDA] },
   'second-half': { kicker: 'Comida', accent: colors.bone, icons: [SEMANA, COMIDA] },
+  // "Lo que no sabías" (surprise.ts): la misma gramática de íconos y color.
+  'steps-deficit': { kicker: 'Pasos', accent: colors.signal.entreno, icons: [PASOS, DEFICIT] },
+  'short-night': { kicker: 'Sueño', accent: colors.dimension.sueno, icons: [SUENO, COMIDA] },
+  'protein-training': {
+    kicker: 'Proteína',
+    accent: colors.signal.proteina,
+    icons: [ENTRENO, PROTEINA],
+  },
+  'weekday-break': { kicker: 'Déficit', accent: colors.oro, icons: [SEMANA, DEFICIT] },
+  rescue: { kicker: 'Déficit', accent: colors.oro, icons: [COMIDA, DEFICIT] },
+  'late-bedtime': { kicker: 'Sueño', accent: colors.dimension.sueno, icons: [DORMIRSE, DEFICIT] },
 }
 
 /** Patrones de exceso: sin chip de diferencia (ni festejo ni señalamiento). */

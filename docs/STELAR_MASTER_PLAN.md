@@ -589,6 +589,16 @@ Copy/paste the following into a Claude coding session:
 - **ST-006 queda:** D-03 cubierto para patrones del mes y sorpresas. El combo ("Tu día fuerte") tiene su propio reveal y "Tus días así"; sin "qué no sabemos" todavía.
 - **Next recommended ticket:** ST-007 (Hoy: un hallazgo calificado destacado + estado vacío honesto).
 
+### 2026-10-13 — ST-006 corte 3 ("Lo que no sabías" como momento de descubrimiento) — rama `master-plan-integrity`
+
+- **Pedido de la dueña:** "si es un patrón detectado la UI debe estar a la altura… inspirada en fitness… se supone que es un nuevo descubrimiento". Revisado con target-user, product-benchmark y uxui-specialist. Rechazados en el camino: calendario de días comparados (repetía los anillos) y todo en un solo color.
+- **Cambio:**
+  - Motor (`surprise.ts`, `bedtime.ts`): `Surprise.compare` (aciertos/total/días por lado, solo hallazgos de tasa), `otherDays` (de promedio), `hitDays`, `threshold` (pasos) y `surpriseToday()` puro ("Hoy llevas N pasos. Te faltan M para los X." / "ya pasaste los X"; sin dato de hoy → nada).
+  - `features/orbit/components/SurpriseDetail.tsx` (nuevo): pantalla completa; eyebrow en el color del dato ("Nuevo patrón encontrado" la 1a vez, luego la etiqueta); íconos de lo que se cruza; anillo héroe con conteo y el otro lado en fila chica; frase; Hoy; evidencia en una línea; "Lo que todavía no sabemos" al pie; "Listo" en pastilla. 1a apertura: llenado + conteo + corona de chispas + háptico (salteable, sin animación con reduce-motion).
+  - `evidence-highlight.ts`: looks de las sorpresas (pasos naranja, sueño índigo, proteína coral, déficit oro) e íconos `walk` / `bed-clock`.
+  - `features/orbit/surprise-seen.ts` (nuevo): qué revelaciones ya viste, solo en el teléfono (AsyncStorage); no toca `seen_combos`.
+- **Tests:** jest 108 / 1345 ✓, tsc ✓, eslint ✓. **Visual:** simulador iOS, cuenta dev (con preview temporal revertido): conteo a mitad ✓, final con chispas ✓. El bloque Hoy no se vio (sin pasos hoy en dev).
+
 ---
 
 ## 11. DECISION LOG — DO NOT SILENTLY REVERSE

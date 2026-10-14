@@ -59,7 +59,20 @@ export type Surprise = {
   /** Los grupos comparados con sus días (ST-005): los mismos conteos con los
    *  que el detector decidió. Gobierna la etiqueta de evidencia. */
   sample?: PatternSample
+  /** La comparación en números (ST-006 · anillos del detalle): solo en los
+   *  hallazgos de TASA ("9 de 11"). Los de promedio (kcal, g) no la traen. */
+  compare?: { strong: SurpriseSide; other: SurpriseSide }
+  /** Los días del otro grupo en hallazgos de PROMEDIO (los de tasa los traen
+   *  en `compare`): el calendario los pinta tenues. */
+  otherDays?: string[]
+  /** De los días comparados, los que cumplieron (cerraron en déficit). */
+  hitDays?: string[]
+  /** Corte del hallazgo cuando lo hay (pasos): lo que la frase ya nombra. */
+  threshold?: { kind: 'steps'; value: number }
 }
+
+/** Un lado de la comparación: cuántos días cumplieron de cuántos, y cuáles. */
+export type SurpriseSide = { label: string; hits: number; total: number; days: string[] }
 
 export type SurpriseOpts = {
   calorieTarget?: number | null
@@ -137,6 +150,7 @@ export function shortNightEffect(signals: readonly DailySignals[]): Surprise | n
     ],
     days: short.map((s) => s.day!),
     daysLabel: 'Tras dormir menos de 6 h',
+    otherDays: good.map((s) => s.day!),
     effect: clamp01(diff / 400),
     minSide: Math.min(short.length, good.length),
     expected: false,
@@ -176,6 +190,7 @@ export function proteinTrainingGap(signals: readonly DailySignals[]): Surprise |
     ],
     days: train.map((s) => s.day!),
     daysLabel: 'Días con entreno',
+    otherDays: rest.map((s) => s.day!),
     effect: clamp01(Math.abs(diff) / 40),
     minSide: Math.min(train.length, rest.length),
     // Comer más proteína cuando entrena es lo esperado; comer menos, no.
@@ -220,6 +235,17 @@ export function stepsDeficit(
     ],
     days: high.map((s) => s.day!),
     daysLabel: `${steps} pasos o más`,
+    hitDays: days.filter((s) => isDeficitDay(s.calories, target)).map((s) => s.day!),
+    compare: {
+      strong: {
+        label: `${steps} pasos o más`,
+        hits: hd,
+        total: high.length,
+        days: high.map((s) => s.day!),
+      },
+      other: { label: 'Menos pasos', hits: ld, total: low.length, days: low.map((s) => s.day!) },
+    },
+    threshold: { kind: 'steps', value: Math.floor(cut / 500) * 500 },
     effect: clamp01(diff / 0.5),
     minSide: Math.min(high.length, low.length),
     expected: true, // moverse ↔ déficit: ya lo intuye
@@ -278,6 +304,21 @@ export function weekdayBreak(
     ],
     days: days.filter((s) => weekdayMon(s.day!) === worst!.wd).map((s) => s.day!),
     daysLabel: `${WEEKDAYS_PLURAL[worst.wd]!.charAt(0).toUpperCase()}${WEEKDAYS_PLURAL[worst.wd]!.slice(1)}`,
+    hitDays: days.filter((s) => isDeficitDay(s.calories, target)).map((s) => s.day!),
+    compare: {
+      strong: {
+        label: `${WEEKDAYS_PLURAL[worst.wd]!.charAt(0).toUpperCase()}${WEEKDAYS_PLURAL[worst.wd]!.slice(1)}`,
+        hits: worst.d,
+        total: worst.n,
+        days: days.filter((s) => weekdayMon(s.day!) === worst!.wd).map((s) => s.day!),
+      },
+      other: {
+        label: 'El resto de la semana',
+        hits: rd,
+        total: rest.length,
+        days: rest.map((s) => s.day!),
+      },
+    },
     effect: clamp01(diff / 0.5),
     minSide: Math.min(worst.n, rest.length),
     expected: weekend, // "el finde se me complica" ya lo sabe
@@ -324,6 +365,21 @@ export function rescueAfterOver(
     ],
     days: after.map((s) => s.day!),
     daysLabel: 'El día después',
+    hitDays: days.filter((s) => isDeficitDay(s.calories, target)).map((s) => s.day!),
+    compare: {
+      strong: {
+        label: 'El día después',
+        hits: ad,
+        total: after.length,
+        days: after.map((s) => s.day!),
+      },
+      other: {
+        label: 'Tus días en general',
+        hits: base,
+        total: days.length,
+        days: days.map((s) => s.day!),
+      },
+    },
     effect: clamp01(diff / 0.5),
     minSide: Math.min(after.length, days.length),
     expected: false,
@@ -368,4 +424,32 @@ export function rankSurprises(
     .filter((x) => x.score >= SURPRISE_MIN_SCORE)
     .sort((a, b) => b.score - a.score)
   return { hero: scored[0]?.s ?? null, others: scored.slice(1, 3).map((x) => x.s) }
+}
+
+/* ── Hoy frente al hallazgo (ST-006 · "tus pasos de hoy") ───────────── */
+
+export type SurpriseToday = { value: number; target: number; reached: boolean; text: string }
+
+/**
+ * Dónde va HOY frente al corte del hallazgo, con el dato real del día (decisión
+ * de la dueña 13 oct 2026: mostrar lo que falta, realismo sin culpa). Solo
+ * para hallazgos con corte (pasos). Sin dato de hoy → null: nunca se estima.
+ */
+export function surpriseToday(
+  s: Pick<Surprise, 'threshold'>,
+  today: Pick<DailySignals, 'steps'> | null | undefined,
+): SurpriseToday | null {
+  if (s.threshold?.kind !== 'steps') return null
+  const steps = today?.steps ?? null
+  if (steps == null || steps <= 0) return null
+  const target = s.threshold.value
+  const reached = steps >= target
+  return {
+    value: steps,
+    target,
+    reached,
+    text: reached
+      ? `Hoy llevas ${fmt(steps)} pasos: ya pasaste los ${fmt(target)}.`
+      : `Hoy llevas ${fmt(steps)} pasos. Te faltan ${fmt(target - steps)} para los ${fmt(target)}.`,
+  }
 }
