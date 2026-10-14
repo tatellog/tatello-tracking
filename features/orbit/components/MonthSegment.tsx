@@ -71,6 +71,13 @@ import {
   type WinningCombo as WinningComboData,
 } from '../month-built'
 import { isDeficitDay } from '../deficit'
+import {
+  EVIDENCE_LABEL_TEXT,
+  monthPatternLabel,
+  patternSampleLine,
+  type EvidenceLabel,
+  type PatternSample,
+} from '../evidence-label'
 import { StelarModal } from '@/components/ui/StelarModal'
 import { evidenceChip, evidenceLook } from '../evidence-highlight'
 import { consumeOrbitEvidence } from '../pending-segment'
@@ -127,6 +134,9 @@ type EvidenceItem = {
   why?: string
   /** Solo deficit-daytype: la forma por día de semana (picos/valles). */
   weekdayShape?: WeekdayShape
+  /** Contrato de evidencia (ST-005): qué tipo de afirmación es + su muestra. */
+  evidenceLabel?: EvidenceLabel
+  sample?: PatternSample
 }
 
 /*
@@ -630,7 +640,7 @@ export function MonthSegment({
     const id = consumeOrbitEvidence()
     if (!id) return
     const p = allPatterns.find((x) => x.id === id)
-    if (p) openEvidence(p)
+    if (p) openEvidence({ ...p, evidenceLabel: monthPatternLabel(p, maturity.stage) })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [evidenceFocused, longHistory, allPatterns])
   // El patrón dominante abre el modal cinemático a pantalla completa (no el panel).
@@ -945,7 +955,12 @@ export function MonthSegment({
                     {supportPatterns.map((p) => (
                       <Pressable
                         key={p.id}
-                        onPress={() => openEvidence(p)}
+                        onPress={() =>
+                          openEvidence({
+                            ...p,
+                            evidenceLabel: monthPatternLabel(p, maturity.stage),
+                          })
+                        }
                         style={({ pressed }) => [styles.alsoFoundRow, pressed && { opacity: 0.75 }]}
                         accessibilityRole="button"
                         accessibilityLabel={`${p.title} Ver la evidencia.`}
@@ -960,9 +975,11 @@ export function MonthSegment({
                   <PatternFindingCard
                     key={p.id}
                     pattern={p}
+                    label={monthPatternLabel(p, maturity.stage)}
                     index={i}
-                    leading={!combo && i === 0}
-                    onOpen={() => openEvidence(p)}
+                    onOpen={() =>
+                      openEvidence({ ...p, evidenceLabel: monthPatternLabel(p, maturity.stage) })
+                    }
                   />
                 ))}
               </>
@@ -2058,19 +2075,21 @@ function DominantPatternCard({
 }
 
 /* Un patrón de apoyo: tarjeta elegante (glifo oro + la frase observacional +
- * "Ver el patrón →" que abre el detalle). Si no hay combo, el primero lleva un
- * eyebrow para coronarlo sin badge de ranking. */
+ * "Ver el patrón →" que abre el detalle). El eyebrow dice QUÉ TIPO de
+ * afirmación es (Observación inicial / Patrón detectado, ST-005) y bajo la
+ * frase va su muestra: cuántos días comparó, sin abrir nada. */
 function PatternFindingCard({
   pattern,
+  label,
   index,
-  leading,
   onOpen,
 }: {
   pattern: MonthPattern
+  label: EvidenceLabel
   index: number
-  leading: boolean
   onOpen: () => void
 }) {
+  const sampleLine = patternSampleLine(pattern.sample)
   // Entrada escalonada (solo opacidad → segura con reduced-motion).
   return (
     <Animated.View entering={FadeIn.duration(360).delay(index * 90)}>
@@ -2078,13 +2097,14 @@ function PatternFindingCard({
         style={styles.findingCard}
         onPress={onOpen}
         accessibilityRole="button"
-        accessibilityLabel={`Ver el patrón: ${pattern.title}`}
+        accessibilityLabel={`${EVIDENCE_LABEL_TEXT[label]}. ${pattern.title} ${sampleLine ?? ''}. Ver el patrón.`}
       >
-        {leading ? <Text style={styles.findingEyebrow}>Un patrón de tu mes</Text> : null}
+        <Text style={styles.findingEyebrow}>{EVIDENCE_LABEL_TEXT[label]}</Text>
         <View style={styles.findingGlyph}>
           <DiscoveryStar color={colors.oro} mag={0.72} size={26} />
         </View>
         <Text style={styles.findingTitle}>{pattern.title}</Text>
+        {sampleLine ? <Text style={styles.findingSample}>{sampleLine}</Text> : null}
         <View style={styles.findingCta}>
           <Text style={styles.findingCtaText}>Ver el patrón</Text>
           <Text style={styles.findingCtaArrow}>→</Text>
@@ -2154,11 +2174,15 @@ function EvidenceModal({
   // Estilo Destacados de Apple Salud: íconos + categoría + chip por patrón.
   const look = evidenceLook(pattern?.id, titleColor)
   const chip = ev ? evidenceChip(pattern?.id, shown, ev.unit) : null
+  const sampleLine = patternSampleLine(pattern?.sample)
   return (
     <StelarModal visible={pattern != null} onClose={onClose}>
       {pattern && ev ? (
         <View style={styles.evStack}>
           <EvidenceHeader look={look} />
+          {pattern.evidenceLabel ? (
+            <Text style={styles.evLabel}>{EVIDENCE_LABEL_TEXT[pattern.evidenceLabel]}</Text>
+          ) : null}
           <Text style={styles.evTitle}>{pattern.title}</Text>
           {pattern.weekdayShape ? (
             // Forma por día de semana: la usuaria VE sus picos y valles + el
@@ -2175,6 +2199,7 @@ function EvidenceModal({
               {pattern.why ? <Text style={styles.evWhy}>{pattern.why}</Text> : null}
               {/* Qué se midió + las fechas concretas que anclan el conteo. */}
               <Text style={styles.evMeta}>{ev.caption}</Text>
+              {sampleLine ? <Text style={styles.evMeta}>{sampleLine}</Text> : null}
               {pattern.dates && pattern.dates.length > 0 ? (
                 <Text style={styles.modalDates}>{formatDates(pattern.dates)}</Text>
               ) : null}
@@ -3340,6 +3365,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   // La frase serif es la protagonista: aquí vive el descubrimiento.
+  findingSample: {
+    marginTop: 8,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    lineHeight: 17,
+    color: colors.niebla,
+    fontVariant: ['tabular-nums'],
+  },
+  evLabel: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.tinyLabel,
+    letterSpacing: 1.6,
+    textTransform: 'uppercase',
+    color: colors.oroSoft,
+  },
   findingTitle: {
     // Hanken, no serif italic: es una observación de dato, no voz de coach.
     fontFamily: typography.uiSemi,

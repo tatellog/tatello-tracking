@@ -45,6 +45,7 @@
  * Toda comparación de día-de-semana se parsea en UTC (como el resto del repo)
  * para no correrse de día por timezone.
  */
+import type { PatternSample } from './evidence-label.ts'
 import {
   detectProteinConsistency,
   detectSleepConsistency,
@@ -1005,6 +1006,10 @@ export type MonthPattern = {
   why?: string
   /** Solo `deficit-daytype`: la forma por día de semana para la evidencia. */
   weekdayShape?: WeekdayShape
+  /** Los grupos que el patrón COMPARÓ y cuántos días tiene cada uno (ST-005 ·
+   *  contrato de evidencia). Solo en `kind: 'pattern'`: son los mismos conteos
+   *  con los que el detector decidió, no una estimación. */
+  sample?: PatternSample
 }
 
 /* Patrones POSITIVOS del MOTOR de consistencia (features/patterns/consistency)
@@ -1196,6 +1201,12 @@ export function detectMonthPatterns(
 
         out.push({
           id: 'deficit-daytype',
+          sample: {
+            groups: [
+              { label: 'Entre semana', days: wdFood.length },
+              { label: 'Fin de semana', days: weFood.length },
+            ],
+          },
           kind: 'pattern',
           label: weekdayStronger ? 'Tu fin de semana' : 'Entre semana',
           // Veredicto en llano: qué te SOSTIENE (fortaleza) + dónde hay MARGEN. Sin
@@ -1253,6 +1264,12 @@ export function detectMonthPatterns(
       const pct = Math.round((heavy / total) * 100)
       out.push({
         id: 'surplus-concentration',
+        sample: {
+          groups: [
+            { label: 'Entre semana', days: wdDays },
+            { label: 'Fin de semana', days: weDays },
+          ],
+        },
         kind: 'pattern',
         label: weekendHeavy ? 'Tu fin de semana' : 'Entre semana',
         title: `El ${pct}% de tu superávit cae ${weekendHeavy ? 'en fin de semana' : 'entre semana'}.`,
@@ -1283,6 +1300,12 @@ export function detectMonthPatterns(
       if (rateHigh >= rateLow * 1.3 && rateHigh - rateLow >= 0.2) {
         out.push({
           id: 'sleep-deficit',
+          sample: {
+            groups: [
+              { label: '7 h o más', days: high.length },
+              { label: 'Menos de 7 h', days: low.length },
+            ],
+          },
           kind: 'pattern',
           label: 'Sueño y déficit',
           title: 'Cuando dormiste 7 h o más, alcanzaste tu déficit más seguido.',
@@ -1318,6 +1341,12 @@ export function detectMonthPatterns(
       if (avgT - avgN >= 12) {
         out.push({
           id: 'training-protein',
+          sample: {
+            groups: [
+              { label: 'Con entreno', days: trained.length },
+              { label: 'Sin entreno', days: notTrained.length },
+            ],
+          },
           kind: 'pattern',
           label: 'Entreno y proteína',
           title: 'Tus días de entreno también fueron tus días de más proteína.',
@@ -1355,6 +1384,12 @@ export function detectMonthPatterns(
       if (rateT >= rateR * 1.3 && rateT - rateR >= 0.2) {
         out.push({
           id: 'movement-deficit',
+          sample: {
+            groups: [
+              { label: 'Con entreno', days: trained.length },
+              { label: 'Sin entreno', days: rest.length },
+            ],
+          },
           kind: 'pattern',
           label: 'Entreno y déficit',
           title: 'Los días que entrenaste, tu déficit apareció más seguido.',
@@ -1389,6 +1424,12 @@ export function detectMonthPatterns(
       const lower = split.label.toLowerCase()
       out.push({
         id: 'workout-type-deficit',
+        sample: {
+          groups: [
+            { label: split.label, days: split.bestTotal },
+            { label: 'Otros entrenos', days: split.otherTotal },
+          ],
+        },
         kind: 'pattern',
         label: `${split.label} y déficit`,
         title: `Tus días de ${lower}, tu déficit apareció más seguido.`,
